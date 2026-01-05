@@ -43,46 +43,23 @@ export class LayoutComponent implements OnInit {
   }
 
   filterMenuItems(): void {
-    if (!this.currentUser || !this.currentUser.role) {
-      console.log('No user or role, showing all items');
-      this.filteredMenuItems = this.filterMenuByRole(this.menuItems, null);
-      return;
-    }
-
-    const userRole = this.currentUser.role;
-    console.log('Filtering menu for role:', userRole);
-    this.filteredMenuItems = this.filterMenuByRole(this.menuItems, userRole);
+    console.log('Showing all menu items to user');
+    this.filteredMenuItems = this.filterMenuByRole(this.menuItems);
   }
 
-  filterMenuByRole(items: MenuItem[], userRole: string | null): MenuItem[] {
+  filterMenuByRole(items: MenuItem[]): MenuItem[] {
     const filtered = items
       .filter(item => {
-        // Only show active items
+        // Only show active items - show all active items regardless of role
         if (!item.active) {
           console.log('Item inactive:', item.label);
           return false;
         }
-        
-        // If no roles specified, show to everyone
-        if (!item.roles || item.roles.length === 0) {
-          console.log('Item has no role restrictions:', item.label);
-          return true;
-        }
-        
-        // If no user role, show all items (for debugging)
-        if (!userRole) {
-          console.log('No user role, showing item:', item.label);
-          return true;
-        }
-        
-        // Check if user's role is in the allowed roles
-        const hasAccess = item.roles.includes(userRole);
-        console.log(`Item: ${item.label}, Allowed roles: ${item.roles}, User role: ${userRole}, Access: ${hasAccess}`);
-        return hasAccess;
+        return true;
       })
       .map(item => ({
         ...item,
-        children: item.children ? this.filterMenuByRole(item.children, userRole) : undefined
+        children: item.children ? this.filterMenuByRole(item.children) : undefined
       }))
       .filter(item => {
         // Keep items without children, or items with at least one visible child

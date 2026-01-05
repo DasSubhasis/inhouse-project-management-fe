@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -78,7 +78,7 @@ export class PreSalesComponent implements OnInit {
 
   rowData: PreSales[] = [];
 
-  constructor(private fb: FormBuilder) {}
+  constructor(private fb: FormBuilder, private ngZone: NgZone) {}
 
   actionsCellRenderer(params: any): HTMLElement {
     const container = document.createElement('div');
@@ -88,19 +88,25 @@ export class PreSalesComponent implements OnInit {
     viewBtn.className = 'p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors';
     viewBtn.title = 'View';
     viewBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
-    viewBtn.addEventListener('click', () => this.viewPreSales(params.data));
+    viewBtn.addEventListener('click', () => {
+      this.ngZone.run(() => this.viewPreSales(params.data));
+    });
     
     const editBtn = document.createElement('button');
     editBtn.className = 'p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors';
     editBtn.title = 'Edit';
     editBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>';
-    editBtn.addEventListener('click', () => this.editPreSales(params.data, params.rowIndex));
+    editBtn.addEventListener('click', () => {
+      this.ngZone.run(() => this.editPreSales(params.data, params.rowIndex));
+    });
     
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors';
     deleteBtn.title = 'Delete';
     deleteBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
-    deleteBtn.addEventListener('click', () => this.deletePreSales(params.rowIndex));
+    deleteBtn.addEventListener('click', () => {
+      this.ngZone.run(() => this.deletePreSales(params.rowIndex));
+    });
     
     container.appendChild(viewBtn);
     container.appendChild(editBtn);
