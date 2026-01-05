@@ -9,6 +9,7 @@ export interface StageHistory {
   stage: string;
   changedBy: string;
   changedDate: Date;
+  remarks?: string;
 }
 
 export interface AdvancePayment {
@@ -19,12 +20,19 @@ export interface AdvancePayment {
   receivedDate: Date;
 }
 
+export interface SerialNumber {
+  serialNumber: string;
+  version?: string;
+  recordedBy: string;
+  recordedDate: Date;
+}
+
 export type ProjectStage = 'Pre-Sales' | 'Quotation' | 'Confirmed' | 'Development' | 'Completed';
 
-export const PROJECT_STAGES: ProjectStage[] = ['Pre-Sales', 'Quotation', 'Completed'];
+export const PROJECT_STAGES: ProjectStage[] = ['Pre-Sales', 'Quotation', 'Confirmed'];
 
 export interface PreSales {
-  projectNo: number;
+  projectNo: string;
   partyName: string;
   projectName: string;
   contactPerson: string;
@@ -37,6 +45,7 @@ export interface PreSales {
   scopeHistory?: ScopeVersion[];
   stageHistory?: StageHistory[];
   advancePayments?: AdvancePayment[];
+  serialNumbers?: SerialNumber[];
   attachments?: File[];
   attachmentUrls?: string[];
 }
