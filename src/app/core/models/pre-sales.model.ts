@@ -5,6 +5,24 @@ export interface ScopeVersion {
   modifiedDate: Date;
 }
 
+export interface StageHistory {
+  stage: string;
+  changedBy: string;
+  changedDate: Date;
+}
+
+export interface AdvancePayment {
+  amount: number;
+  date: Date;
+  tallyEntryNumber: string;
+  receivedBy: string;
+  receivedDate: Date;
+}
+
+export type ProjectStage = 'Pre-Sales' | 'Quotation' | 'Confirmed' | 'Development' | 'Completed';
+
+export const PROJECT_STAGES: ProjectStage[] = ['Pre-Sales', 'Quotation', 'Completed'];
+
 export interface PreSales {
   projectNo: number;
   partyName: string;
@@ -15,7 +33,9 @@ export interface PreSales {
   agentName: string;
   projectValue: number;
   scopeOfDevelopment: string;
+  currentStage: ProjectStage;
   scopeHistory?: ScopeVersion[];
+  stageHistory?: StageHistory[];
   attachments?: File[];
   attachmentUrls?: string[];
 }

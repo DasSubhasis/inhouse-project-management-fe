@@ -4,7 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, GridReadyEvent, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import Swal from 'sweetalert2';
-import { PreSales, ScopeVersion } from '../../core/models/pre-sales.model';
+import { PreSales, ScopeVersion, StageHistory, ProjectStage, PROJECT_STAGES } from '../../core/models/pre-sales.model';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -26,6 +26,8 @@ export class PreSalesComponent implements OnInit {
   selectedFiles: File[] = [];
   currentUserName = 'Admin User'; // This should come from auth service
   scopeHistoryExpanded = false;
+  projectStages = PROJECT_STAGES;
+  stageHistoryExpanded = false;
 
   // AG Grid Configuration
   columnDefs: ColDef[] = [
@@ -61,6 +63,22 @@ export class PreSalesComponent implements OnInit {
           return '₹ ' + params.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
         return '';
+      }
+    },
+    { 
+      field: 'currentStage', 
+      headerName: 'Stage', 
+      width: 140,
+      cellRenderer: (params: any) => {
+        const stage = params.value;
+        const colors: { [key: string]: string } = {
+          'Pre-Sales': 'bg-blue-100 text-blue-800',
+          'Quotation': 'bg-yellow-100 text-yellow-800',
+          'Confirmed': 'bg-green-100 text-green-800',
+          'Development': 'bg-purple-100 text-purple-800',
+          'Completed': 'bg-gray-100 text-gray-800'
+        };
+        return `<span class="px-2 py-1 text-xs font-medium rounded ${colors[stage] || 'bg-gray-100 text-gray-800'}">${stage}</span>`;
       }
     },
     {
@@ -135,6 +153,7 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Amit Sharma',
         projectValue: 1500000.00,
         scopeOfDevelopment: 'Complete ERP system with inventory, accounting, HR, and CRM modules. Integration with existing systems and third-party APIs required. Mobile app support included.',
+        currentStage: 'Quotation' as ProjectStage,
         scopeHistory: [
           {
             version: 1,
@@ -161,6 +180,18 @@ export class PreSalesComponent implements OnInit {
             modifiedDate: new Date('2026-01-03T11:15:00')
           }
         ],
+        stageHistory: [
+          {
+            stage: 'Pre-Sales',
+            changedBy: 'Rajesh Kumar',
+            changedDate: new Date('2025-11-01T10:30:00')
+          },
+          {
+            stage: 'Quotation',
+            changedBy: 'Amit Sharma',
+            changedDate: new Date('2025-12-10T14:00:00')
+          }
+        ],
         attachmentUrls: []
       },
       {
@@ -173,6 +204,7 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Neha Gupta',
         projectValue: 850000.00,
         scopeOfDevelopment: 'Cross-platform mobile application for iOS and Android with backend API integration, push notifications, and analytics dashboard.',
+        currentStage: 'Confirmed' as ProjectStage,
         scopeHistory: [
           {
             version: 1,
@@ -193,6 +225,23 @@ export class PreSalesComponent implements OnInit {
             modifiedDate: new Date('2026-01-02T10:00:00')
           }
         ],
+        stageHistory: [
+          {
+            stage: 'Pre-Sales',
+            changedBy: 'Neha Gupta',
+            changedDate: new Date('2025-12-10T16:00:00')
+          },
+          {
+            stage: 'Quotation',
+            changedBy: 'Priya Patel',
+            changedDate: new Date('2025-12-22T11:30:00')
+          },
+          {
+            stage: 'Confirmed',
+            changedBy: 'Admin User',
+            changedDate: new Date('2026-01-04T09:45:00')
+          }
+        ],
         attachmentUrls: []
       },
       {
@@ -205,12 +254,20 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Ravi Verma',
         projectValue: 2250000.00,
         scopeOfDevelopment: 'Point of Sale system with inventory management, barcode scanning, and real-time reporting for 50+ stores.',
+        currentStage: 'Pre-Sales' as ProjectStage,
         scopeHistory: [
           {
             version: 1,
             scope: 'Point of Sale system with inventory management, barcode scanning, and real-time reporting for 50+ stores.',
             modifiedBy: 'Ravi Verma',
             modifiedDate: new Date('2025-12-18T15:20:00')
+          }
+        ],
+        stageHistory: [
+          {
+            stage: 'Pre-Sales',
+            changedBy: 'Ravi Verma',
+            changedDate: new Date('2025-12-18T15:20:00')
           }
         ],
         attachmentUrls: []
@@ -225,12 +282,20 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Amit Sharma',
         projectValue: 675000.00,
         scopeOfDevelopment: 'LMS with video streaming, assignment management, student tracking, and parent portal.',
+        currentStage: 'Pre-Sales' as ProjectStage,
         scopeHistory: [
           {
             version: 1,
             scope: 'LMS with video streaming, assignment management, student tracking, and parent portal.',
             modifiedBy: 'Amit Sharma',
             modifiedDate: new Date('2025-12-22T11:00:00')
+          }
+        ],
+        stageHistory: [
+          {
+            stage: 'Pre-Sales',
+            changedBy: 'Amit Sharma',
+            changedDate: new Date('2025-12-22T11:00:00')
           }
         ],
         attachmentUrls: []
@@ -245,12 +310,20 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Neha Gupta',
         projectValue: 3200000.00,
         scopeOfDevelopment: 'Comprehensive HMS including patient records, appointments, billing, pharmacy, and lab management.',
+        currentStage: 'Pre-Sales' as ProjectStage,
         scopeHistory: [
           {
             version: 1,
             scope: 'Comprehensive HMS including patient records, appointments, billing, pharmacy, and lab management.',
             modifiedBy: 'Neha Gupta',
             modifiedDate: new Date('2025-12-28T14:30:00')
+          }
+        ],
+        stageHistory: [
+          {
+            stage: 'Pre-Sales',
+            changedBy: 'Neha Gupta',
+            changedDate: new Date('2025-12-28T14:30:00')
           }
         ],
         attachmentUrls: []
@@ -268,6 +341,7 @@ export class PreSalesComponent implements OnInit {
       agentName: ['', [Validators.required, Validators.minLength(3)]],
       projectValue: ['', [Validators.required, Validators.min(0)]],
       scopeOfDevelopment: ['', [Validators.required, Validators.minLength(10)]],
+      currentStage: ['Pre-Sales', Validators.required],
       attachments: [null]
     });
   }
@@ -309,6 +383,17 @@ export class PreSalesComponent implements OnInit {
         // Update existing record
         const existingRecord = this.rowData[this.editingIndex];
         const scopeChanged = existingRecord.scopeOfDevelopment !== formValue.scopeOfDevelopment;
+        const stageChanged = existingRecord.currentStage !== formValue.currentStage;
+        
+        // Check if stage is being reverted
+        const currentStageIndex = PROJECT_STAGES.indexOf(existingRecord.currentStage);
+        const newStageIndex = PROJECT_STAGES.indexOf(formValue.currentStage);
+        
+        if (stageChanged && newStageIndex < currentStageIndex) {
+          this.isLoading = false;
+          Swal.fire('Invalid Stage Change', 'Cannot revert to a previous stage. Stages can only progress forward.', 'error');
+          return;
+        }
         
         // Create new scope version if scope changed
         let updatedScopeHistory = existingRecord.scopeHistory || [];
@@ -322,15 +407,31 @@ export class PreSalesComponent implements OnInit {
           updatedScopeHistory = [...updatedScopeHistory, newVersion];
         }
         
+        // Create stage history entry if stage changed
+        let updatedStageHistory = existingRecord.stageHistory || [];
+        if (stageChanged) {
+          const newStageEntry: StageHistory = {
+            stage: formValue.currentStage,
+            changedBy: this.currentUserName,
+            changedDate: new Date()
+          };
+          updatedStageHistory = [...updatedStageHistory, newStageEntry];
+        }
+        
         this.rowData[this.editingIndex] = {
           projectNo: existingRecord.projectNo,
           ...formValue,
           projectValue: parseFloat(formValue.projectValue),
           scopeHistory: updatedScopeHistory,
+          stageHistory: updatedStageHistory,
           attachmentUrls: []
         };
         
-        Swal.fire('Success', 'Pre-sales record updated successfully' + (scopeChanged ? ' (New scope version created)' : ''), 'success');
+        let message = 'Pre-sales record updated successfully';
+        if (scopeChanged) message += ' (New scope version created)';
+        if (stageChanged) message += ` (Stage updated to ${formValue.currentStage})`;
+        
+        Swal.fire('Success', message, 'success');
       } else {
         // Add new record
         const newProjectNo = Math.max(...this.rowData.map(r => r.projectNo)) + 1;
@@ -341,11 +442,18 @@ export class PreSalesComponent implements OnInit {
           modifiedDate: new Date()
         };
         
+        const initialStageEntry: StageHistory = {
+          stage: formValue.currentStage,
+          changedBy: this.currentUserName,
+          changedDate: new Date()
+        };
+        
         const newRecord: PreSales = {
           projectNo: newProjectNo,
           ...formValue,
           projectValue: parseFloat(formValue.projectValue),
           scopeHistory: [initialScopeVersion],
+          stageHistory: [initialStageEntry],
           attachmentUrls: []
         };
         
@@ -440,6 +548,7 @@ export class PreSalesComponent implements OnInit {
     this.editingIndex = index;
     this.editingRecord = data;
     this.scopeHistoryExpanded = false;
+    this.stageHistoryExpanded = false;
     
     this.preSalesForm.patchValue({
       partyName: data.partyName,
@@ -449,7 +558,8 @@ export class PreSalesComponent implements OnInit {
       emailId: data.emailId,
       agentName: data.agentName,
       projectValue: data.projectValue,
-      scopeOfDevelopment: data.scopeOfDevelopment
+      scopeOfDevelopment: data.scopeOfDevelopment,
+      currentStage: data.currentStage
     });
     
     this.isModalOpen = true;
@@ -590,6 +700,25 @@ export class PreSalesComponent implements OnInit {
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  toggleStageHistoryExpanded(): void {
+    this.stageHistoryExpanded = !this.stageHistoryExpanded;
+  }
+
+  getReversedStageHistory(): StageHistory[] {
+    if (!this.editingRecord?.stageHistory) return [];
+    return [...this.editingRecord.stageHistory].reverse();
+  }
+
+  getAvailableStages(): ProjectStage[] {
+    if (!this.isEditMode || !this.editingRecord) {
+      return PROJECT_STAGES;
+    }
+    
+    const currentStageIndex = PROJECT_STAGES.indexOf(this.editingRecord.currentStage);
+    // Only show current stage and forward stages
+    return PROJECT_STAGES.slice(currentStageIndex);
   }
 
   onGridReady(params: GridReadyEvent): void {
