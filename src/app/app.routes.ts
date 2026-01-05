@@ -21,10 +21,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/home/home.component').then(m => m.HomeComponent)
       },
       {
-        path: 'call',
-        loadComponent: () => import('./features/call/call.component').then(m => m.CallComponent)
-      },
-      {
         path: 'contacts',
         loadComponent: () => import('./features/home/home.component').then(m => m.HomeComponent) // Placeholder
       },
