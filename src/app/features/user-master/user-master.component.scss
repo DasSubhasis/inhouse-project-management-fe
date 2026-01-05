@@ -1,0 +1,69 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.ag-theme-balham {
+  --ag-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  --ag-font-size: 14px;
+  --ag-header-height: 48px;
+  --ag-row-height: 50px;
+}
+
+// Custom styling for AG Grid cells
+::ng-deep {
+  .ag-header-cell-label {
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .ag-row {
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .ag-row:hover {
+    background-color: #f9fafb;
+  }
+
+  .ag-cell {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+  }
+
+  .ag-paging-panel {
+    border-top: 1px solid #e5e7eb;
+    padding: 12px;
+  }
+}
+
+// Modal animations
+.fixed {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// Button hover effects
+button {
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+// Form validation
+input.ng-invalid.ng-touched {
+  border-color: #ef4444;
+}
+
+input.ng-valid.ng-touched {
+  border-color: #10b981;
+}

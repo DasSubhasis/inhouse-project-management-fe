@@ -1,0 +1,152 @@
+[
+  {
+    "id": 1,
+    "name": "John Doe",
+    "phone": "+1 234 567 8900",
+    "type": "incoming",
+    "duration": "3m 45s",
+    "timestamp": "2025-12-17T08:15:30",
+    "status": "completed",
+    "notes": "Discussed project requirements"
+  },
+  {
+    "id": 2,
+    "name": "Jane Smith",
+    "phone": "+1 234 567 8901",
+    "type": "outgoing",
+    "duration": "5m 12s",
+    "timestamp": "2025-12-17T07:45:20",
+    "status": "completed",
+    "notes": "Follow-up on previous conversation"
+  },
+  {
+    "id": 3,
+    "name": "Bob Johnson",
+    "phone": "+1 234 567 8902",
+    "type": "missed",
+    "duration": "0m 0s",
+    "timestamp": "2025-12-17T06:30:15",
+    "status": "missed",
+    "notes": ""
+  },
+  {
+    "id": 4,
+    "name": "Alice Williams",
+    "phone": "+1 234 567 8903",
+    "type": "incoming",
+    "duration": "2m 30s",
+    "timestamp": "2025-12-17T05:20:45",
+    "status": "completed",
+    "notes": "Customer support inquiry"
+  },
+  {
+    "id": 5,
+    "name": "Charlie Brown",
+    "phone": "+1 234 567 8904",
+    "type": "outgoing",
+    "duration": "7m 20s",
+    "timestamp": "2025-12-17T04:10:30",
+    "status": "completed",
+    "notes": "Sales presentation"
+  },
+  {
+    "id": 6,
+    "name": "Diana Prince",
+    "phone": "+1 234 567 8905",
+    "type": "incoming",
+    "duration": "4m 15s",
+    "timestamp": "2025-12-16T22:30:00",
+    "status": "completed",
+    "notes": "Technical support"
+  },
+  {
+    "id": 7,
+    "name": "Edward Norton",
+    "phone": "+1 234 567 8906",
+    "type": "missed",
+    "duration": "0m 0s",
+    "timestamp": "2025-12-16T20:15:30",
+    "status": "missed",
+    "notes": ""
+  },
+  {
+    "id": 8,
+    "name": "Fiona Apple",
+    "phone": "+1 234 567 8907",
+    "type": "outgoing",
+    "duration": "6m 45s",
+    "timestamp": "2025-12-16T18:45:20",
+    "status": "completed",
+    "notes": "Product demo"
+  },
+  {
+    "id": 9,
+    "name": "George Martin",
+    "phone": "+1 234 567 8908",
+    "type": "incoming",
+    "duration": "3m 55s",
+    "timestamp": "2025-12-16T16:20:10",
+    "status": "completed",
+    "notes": "General inquiry"
+  },
+  {
+    "id": 10,
+    "name": "Helen Hunt",
+    "phone": "+1 234 567 8909",
+    "type": "outgoing",
+    "duration": "8m 30s",
+    "timestamp": "2025-12-16T14:10:45",
+    "status": "completed",
+    "notes": "Contract negotiation"
+  },
+  {
+    "id": 11,
+    "name": "Ian McKellen",
+    "phone": "+1 234 567 8910",
+    "type": "incoming",
+    "duration": "2m 15s",
+    "timestamp": "2025-12-16T12:05:30",
+    "status": "completed",
+    "notes": "Schedule meeting"
+  },
+  {
+    "id": 12,
+    "name": "Julia Roberts",
+    "phone": "+1 234 567 8911",
+    "type": "missed",
+    "duration": "0m 0s",
+    "timestamp": "2025-12-16T10:30:00",
+    "status": "missed",
+    "notes": ""
+  },
+  {
+    "id": 13,
+    "name": "Kevin Spacey",
+    "phone": "+1 234 567 8912",
+    "type": "outgoing",
+    "duration": "5m 40s",
+    "timestamp": "2025-12-16T08:15:20",
+    "status": "completed",
+    "notes": "Project update"
+  },
+  {
+    "id": 14,
+    "name": "Laura Palmer",
+    "phone": "+1 234 567 8913",
+    "type": "incoming",
+    "duration": "4m 50s",
+    "timestamp": "2025-12-15T22:45:10",
+    "status": "completed",
+    "notes": "Complaint resolution"
+  },
+  {
+    "id": 15,
+    "name": "Michael Scott",
+    "phone": "+1 234 567 8914",
+    "type": "outgoing",
+    "duration": "9m 15s",
+    "timestamp": "2025-12-15T20:30:45",
+    "status": "completed",
+    "notes": "Partnership discussion"
+  }
+]

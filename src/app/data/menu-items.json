@@ -1,0 +1,67 @@
+[
+  {
+    "id": 1,
+    "label": "Home",
+    "path": "/home",
+    "icon": "home",
+    "active": true,
+    "roles": ["Admin", "User", "Manager"]
+  },
+  {
+    "id": 2,
+    "label": "Opportunities",
+    "icon": "briefcase",
+    "active": true,
+    "roles": ["Admin", "User", "Manager"],
+    "children": [
+      {
+        "id": 21,
+        "label": "Pre-sales",
+        "path": "/opportunities/pre-sales",
+        "icon": "search",
+        "active": true,
+        "roles": ["Admin", "User", "Manager"]
+      },
+      {
+        "id": 22,
+        "label": "Quotation",
+        "path": "/opportunities/quotation",
+        "icon": "document",
+        "active": true,
+        "roles": ["Admin", "User", "Manager"]
+      },
+      {
+        "id": 23,
+        "label": "Confirmed",
+        "path": "/opportunities/confirmed",
+        "icon": "check-circle",
+        "active": true,
+        "roles": ["Admin", "User", "Manager"]
+      },
+      {
+        "id": 24,
+        "label": "Development",
+        "path": "/opportunities/development",
+        "icon": "code",
+        "active": true,
+        "roles": ["Admin", "User", "Manager"]
+      },
+      {
+        "id": 25,
+        "label": "Completed",
+        "path": "/opportunities/completed",
+        "icon": "check",
+        "active": true,
+        "roles": ["Admin", "User", "Manager"]
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "label": "Analytics",
+    "path": "/analytics",
+    "icon": "chart",
+    "active": true,
+    "roles": ["Admin", "User", "Manager"]
+  }
+]

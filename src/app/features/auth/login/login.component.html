@@ -1,0 +1,120 @@
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8">
+    <!-- Logo/Title Section -->
+    <div class="text-center">
+      <h2 class="text-4xl font-bold text-gray-900 mb-2">Project Management</h2>
+      <p class="text-gray-600">{{ showOTPInput ? 'Enter your OTP' : 'Sign in to your account' }}</p>
+    </div>
+
+    <!-- Login Form -->
+    <div class="bg-white rounded-2xl shadow-xl p-8" *ngIf="!showOTPInput">
+      <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="space-y-6">
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+            Email Address
+          </label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            class="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-150 ease-in-out"
+            placeholder="Enter your email"
+            [class.border-red-500]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched"
+          />
+          <p *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" 
+             class="mt-2 text-sm text-red-600">
+            Please enter a valid email address
+          </p>
+        </div>
+
+        <!-- Error Message -->
+        <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {{ errorMessage }}
+        </div>
+
+        <!-- Success Message -->
+        <div *ngIf="successMessage" class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          {{ successMessage }}
+        </div>
+
+        <button
+          type="submit"
+          [disabled]="isLoading || loginForm.invalid"
+          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
+        >
+          <span *ngIf="!isLoading">Send OTP</span>
+          <span *ngIf="isLoading" class="flex items-center">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Sending...
+          </span>
+        </button>
+      </form>
+    </div>
+
+    <!-- OTP Verification Form -->
+    <div class="bg-white rounded-2xl shadow-xl p-6" *ngIf="showOTPInput">
+      <form [formGroup]="otpForm" (ngSubmit)="onOTPSubmit()" class="space-y-4">
+        <div class="text-center">          
+          <p class="text-xs text-gray-600">Check your console for the OTP code</p>
+        </div>
+
+        <div>
+          <label for="otp" class="block text-xs font-medium text-gray-700 mb-1.5">
+            Enter OTP
+          </label>
+          <input
+            id="otp"
+            type="text"
+            formControlName="otp"
+            maxlength="6"
+            class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg text-center text-xl tracking-widest font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-150 ease-in-out"
+            placeholder="000000"
+            [class.border-red-500]="otpForm.get('otp')?.invalid && otpForm.get('otp')?.touched"
+          />
+          <p *ngIf="otpForm.get('otp')?.invalid && otpForm.get('otp')?.touched" 
+             class="mt-1 text-xs text-red-600">
+            OTP must be 6 digits
+          </p>
+        </div>
+
+        <!-- Error Message -->
+        <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+          {{ errorMessage }}
+        </div>
+
+        <!-- Success Message -->
+        <div *ngIf="successMessage" class="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-xs">
+          {{ successMessage }}
+        </div>
+
+        <div class="space-y-2">
+          <button
+            type="submit"
+            [disabled]="isLoading || otpForm.invalid"
+            class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
+          >
+            <span *ngIf="!isLoading">Verify OTP</span>
+            <span *ngIf="isLoading" class="flex items-center">
+              <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Verifying...
+            </span>
+          </button>
+
+          <button
+            type="button"
+            (click)="resetForm()"
+            class="w-full flex justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition duration-150 ease-in-out"
+          >
+            Back to Login
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

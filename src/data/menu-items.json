@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "label": "Home",
+    "icon": "home",
+    "path": "/home"
+  },
+  {
+    "id": 2,
+    "label": "Calls",
+    "icon": "phone",
+    "path": "/calls"
+  },
+  {
+    "id": 7,
+    "label": "Serial Report",
+    "icon": "document",
+    "path": "/serial-report"
+  },
+  {
+    "id": 3,
+    "label": "Contacts",
+    "icon": "users",
+    "path": "/contacts"
+  },
+  {
+    "id": 4,
+    "label": "Tags",
+    "icon": "tag",
+    "path": "/tags"
+  },
+  {
+    "id": 8,
+    "label": "User Master",
+    "icon": "user",
+    "path": "/user-master"
+  },
+  {
+    "id": 5,
+    "label": "Analytics",
+    "icon": "chart",
+    "path": "/analytics"
+  },
+  {
+    "id": 6,
+    "label": "Settings",
+    "icon": "settings",
+    "path": "/settings"
+  }
+]

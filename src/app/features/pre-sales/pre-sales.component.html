@@ -1,0 +1,273 @@
+<div class="h-full flex flex-col bg-gray-50 overflow-hidden">
+  <!-- Header -->
+  <div class="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
+    <div class="px-3 py-2 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Pre-Sales</h1>
+        <p class="text-sm text-gray-600 mt-1">Manage pre-sales opportunities</p>
+      </div>
+      <button
+        (click)="openModal()"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200 flex items-center gap-2"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        Add Pre-Sales
+      </button>
+    </div>
+  </div>
+
+  <!-- AG Grid -->
+  <div class="p-3">
+    <div class="bg-white rounded-lg shadow">
+      <ag-grid-angular
+        class="ag-theme-balham"
+        style="width: 100%; height: calc(100vh - 230px);"
+        [columnDefs]="columnDefs"
+        [rowData]="rowData"
+        [defaultColDef]="defaultColDef"
+        [pagination]="true"
+        [paginationPageSize]="10"
+        [paginationPageSizeSelector]="[10, 20, 50]"
+        (gridReady)="onGridReady($event)"
+        [animateRows]="true"
+        [rowHeight]="40"
+      ></ag-grid-angular>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div *ngIf="isModalOpen" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="bg-white border-b border-gray-200 px-4 py-2 rounded-t-lg flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-gray-900">
+            {{ isEditMode ? 'Edit Pre-Sales' : 'Add Pre-Sales' }}
+          </h2>
+          <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <form [formGroup]="preSalesForm" (ngSubmit)="onSubmit()" class="px-4 py-3 overflow-y-auto flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-3 gap-y-2">
+          <!-- Party Name -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Party Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              formControlName="partyName"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('partyName')?.invalid && preSalesForm.get('partyName')?.touched"
+            />
+            <p *ngIf="preSalesForm.get('partyName')?.invalid && preSalesForm.get('partyName')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Required (min 3 chars)
+            </p>
+          </div>
+
+          <!-- Project Name -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Project Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              formControlName="projectName"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('projectName')?.invalid && preSalesForm.get('projectName')?.touched"
+            />
+            <p *ngIf="preSalesForm.get('projectName')?.invalid && preSalesForm.get('projectName')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Required (min 3 chars)
+            </p>
+          </div>
+
+          <!-- Contact Person -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Contact Person <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              formControlName="contactPerson"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('contactPerson')?.invalid && preSalesForm.get('contactPerson')?.touched"
+            />
+            <p *ngIf="preSalesForm.get('contactPerson')?.invalid && preSalesForm.get('contactPerson')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Required (min 3 chars)
+            </p>
+          </div>
+
+          <!-- Mobile Number -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Mobile Number <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              formControlName="mobileNumber"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('mobileNumber')?.invalid && preSalesForm.get('mobileNumber')?.touched"
+              placeholder="10 digit number"
+            />
+            <p *ngIf="preSalesForm.get('mobileNumber')?.invalid && preSalesForm.get('mobileNumber')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              10 digit required
+            </p>
+          </div>
+
+          <!-- Email ID -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Email ID <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              formControlName="emailId"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('emailId')?.invalid && preSalesForm.get('emailId')?.touched"
+            />
+            <p *ngIf="preSalesForm.get('emailId')?.invalid && preSalesForm.get('emailId')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Valid email required
+            </p>
+          </div>
+
+          <!-- Agent Name -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Agent Name <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              formControlName="agentName"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('agentName')?.invalid && preSalesForm.get('agentName')?.touched"
+            />
+            <p *ngIf="preSalesForm.get('agentName')?.invalid && preSalesForm.get('agentName')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Required (min 3 chars)
+            </p>
+          </div>
+
+          <!-- Project Value -->
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Project Value (₹) <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              formControlName="projectValue"
+              step="0.01"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              [class.border-red-500]="preSalesForm.get('projectValue')?.invalid && preSalesForm.get('projectValue')?.touched"
+            />
+            <p *ngIf="preSalesForm.get('projectValue')?.invalid && preSalesForm.get('projectValue')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Must be positive
+            </p>
+          </div>
+
+          <!-- Scope of Development -->
+          <div class="col-span-1 md:col-span-2">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Scope of Development <span class="text-red-500">*</span>
+            </label>
+            <textarea
+              formControlName="scopeOfDevelopment"
+              rows="2"
+              class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none"
+              [class.border-red-500]="preSalesForm.get('scopeOfDevelopment')?.invalid && preSalesForm.get('scopeOfDevelopment')?.touched"
+            ></textarea>
+            <p *ngIf="preSalesForm.get('scopeOfDevelopment')?.invalid && preSalesForm.get('scopeOfDevelopment')?.touched" class="text-red-500 text-[10px] mt-0.5">
+              Required (min 10 chars)
+            </p>
+          </div>
+
+          <!-- Attachments -->
+          <div class="col-span-1 md:col-span-3">
+            <label class="block text-xs font-medium text-gray-700 mb-0.5">
+              Attachments
+            </label>
+            <div
+              (dragover)="onDragOver($event)"
+              (dragleave)="onDragLeave($event)"
+              (drop)="onDrop($event)"
+              [class.border-blue-500]="isDragging"
+              [class.bg-blue-50]="isDragging"
+              class="w-full px-3 py-3 border-2 border-dashed border-gray-300 rounded text-center transition-colors cursor-pointer hover:border-gray-400"
+              (click)="fileInput.click()"
+            >
+              <svg class="mx-auto h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              <p class="mt-1 text-xs text-gray-600">
+                <span class="font-medium text-blue-600">Click</span> or drag and drop
+              </p>
+              <input
+                #fileInput
+                type="file"
+                (change)="onFileChange($event)"
+                multiple
+                class="hidden"
+              />
+            </div>
+            
+            <!-- Selected Files List -->
+            <div *ngIf="selectedFiles.length > 0" class="mt-1 space-y-1">
+              <div *ngFor="let file of selectedFiles; let i = index" 
+                   class="flex items-center justify-between px-2 py-1 bg-gray-50 rounded border border-gray-200">
+                <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                  <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span class="text-xs text-gray-700 truncate">{{ file.name }}</span>
+                  <span class="text-[10px] text-gray-500 flex-shrink-0">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                </div>
+                <button
+                  type="button"
+                  (click)="removeFile(i)"
+                  class="ml-1 text-red-500 hover:text-red-700 flex-shrink-0"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="flex justify-end gap-2 mt-3 pt-2 border-t border-gray-200">
+          <button
+            type="button"
+            (click)="closeModal()"
+            class="px-4 py-1 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            [disabled]="isLoading"
+            class="px-4 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <span *ngIf="isLoading" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            {{ isEditMode ? 'Update' : 'Save' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div *ngIf="isLoading && !isModalOpen" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-8 flex flex-col items-center">
+      <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-4 text-gray-700 font-medium">Loading...</p>
+    </div>
+  </div>
+</div>
