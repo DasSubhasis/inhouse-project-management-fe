@@ -36,6 +36,7 @@ export interface PreSales {
   currentStage: ProjectStage;
   scopeHistory?: ScopeVersion[];
   stageHistory?: StageHistory[];
+  advancePayments?: AdvancePayment[];
   attachments?: File[];
   attachmentUrls?: string[];
 }

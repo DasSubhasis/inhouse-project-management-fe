@@ -4,7 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, GridReadyEvent, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import Swal from 'sweetalert2';
-import { PreSales, ScopeVersion, StageHistory, ProjectStage, PROJECT_STAGES } from '../../core/models/pre-sales.model';
+import { PreSales, ScopeVersion, StageHistory, ProjectStage, PROJECT_STAGES, AdvancePayment } from '../../core/models/pre-sales.model';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -17,11 +17,15 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 })
 export class PreSalesComponent implements OnInit {
   preSalesForm!: FormGroup;
+  advanceForm!: FormGroup;
   isModalOpen = false;
+  isAdvanceModalOpen = false;
   isLoading = false;
   isEditMode = false;
   editingIndex: number = -1;
   editingRecord: PreSales | null = null;
+  selectedProjectForAdvance: PreSales | null = null;
+  selectedProjectIndex: number = -1;
   isDragging = false;
   selectedFiles: File[] = [];
   currentUserName = 'Admin User'; // This should come from auth service
@@ -83,7 +87,7 @@ export class PreSalesComponent implements OnInit {
     },
     {
       headerName: 'Actions',
-      width: 120,
+      width: 180,
       cellRenderer: this.actionsCellRenderer.bind(this),
       pinned: 'right',
       sortable: false,
@@ -121,6 +125,18 @@ export class PreSalesComponent implements OnInit {
       this.ngZone.run(() => this.editPreSales(params.data, params.rowIndex));
     });
     
+    // Show Advance button if stage is Quotation or Confirmed
+    if (params.data.currentStage === 'Quotation' || params.data.currentStage === 'Confirmed') {
+      const advanceBtn = document.createElement('button');
+      advanceBtn.className = 'p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors';
+      advanceBtn.title = 'Add Advance';
+      advanceBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+      advanceBtn.addEventListener('click', () => {
+        this.ngZone.run(() => this.openAdvanceModal(params.data, params.rowIndex));
+      });
+      container.appendChild(advanceBtn);
+    }
+    
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors';
     deleteBtn.title = 'Delete';
@@ -138,6 +154,7 @@ export class PreSalesComponent implements OnInit {
 
   ngOnInit(): void {
     this.initForm();
+    this.initAdvanceForm();
     this.loadSampleData();
   }
 
@@ -190,6 +207,22 @@ export class PreSalesComponent implements OnInit {
             stage: 'Quotation',
             changedBy: 'Amit Sharma',
             changedDate: new Date('2025-12-10T14:00:00')
+          }
+        ],
+        advancePayments: [
+          {
+            amount: 250000.00,
+            date: new Date('2025-12-15'),
+            tallyEntryNumber: 'TLY-2025-001234',
+            receivedBy: 'Amit Sharma',
+            receivedDate: new Date('2025-12-15T10:30:00')
+          },
+          {
+            amount: 150000.00,
+            date: new Date('2026-01-05'),
+            tallyEntryNumber: 'TLY-2026-000012',
+            receivedBy: 'Admin User',
+            receivedDate: new Date('2026-01-05T14:20:00')
           }
         ],
         attachmentUrls: []
@@ -343,6 +376,14 @@ export class PreSalesComponent implements OnInit {
       scopeOfDevelopment: ['', [Validators.required, Validators.minLength(10)]],
       currentStage: ['Pre-Sales', Validators.required],
       attachments: [null]
+    });
+  }
+
+  initAdvanceForm(): void {
+    this.advanceForm = this.fb.group({
+      amount: ['', [Validators.required, Validators.min(1)]],
+      date: ['', Validators.required],
+      tallyEntryNumber: ['', [Validators.required, Validators.minLength(1)]]
     });
   }
 
@@ -719,6 +760,73 @@ export class PreSalesComponent implements OnInit {
     const currentStageIndex = PROJECT_STAGES.indexOf(this.editingRecord.currentStage);
     // Only show current stage and forward stages
     return PROJECT_STAGES.slice(currentStageIndex);
+  }
+
+  openAdvanceModal(data: PreSales, index: number): void {
+    this.selectedProjectForAdvance = data;
+    this.selectedProjectIndex = index;
+    this.advanceForm.reset();
+    this.isAdvanceModalOpen = true;
+  }
+
+  closeAdvanceModal(): void {
+    this.isAdvanceModalOpen = false;
+    this.selectedProjectForAdvance = null;
+    this.selectedProjectIndex = -1;
+    this.advanceForm.reset();
+  }
+
+  onAdvanceSubmit(): void {
+    if (this.advanceForm.invalid) {
+      Object.keys(this.advanceForm.controls).forEach(key => {
+        this.advanceForm.controls[key].markAsTouched();
+      });
+      Swal.fire('Validation Error', 'Please fill all required fields correctly', 'error');
+      return;
+    }
+
+    if (this.selectedProjectIndex < 0) {
+      Swal.fire('Error', 'No project selected', 'error');
+      return;
+    }
+
+    this.isLoading = true;
+
+    setTimeout(() => {
+      const formValue = this.advanceForm.value;
+      const existingRecord = this.rowData[this.selectedProjectIndex];
+      
+      const newAdvance: AdvancePayment = {
+        amount: parseFloat(formValue.amount),
+        date: new Date(formValue.date),
+        tallyEntryNumber: formValue.tallyEntryNumber,
+        receivedBy: this.currentUserName,
+        receivedDate: new Date()
+      };
+
+      const updatedAdvances = [...(existingRecord.advancePayments || []), newAdvance];
+      
+      this.rowData[this.selectedProjectIndex] = {
+        ...existingRecord,
+        advancePayments: updatedAdvances
+      };
+
+      const totalAdvance = updatedAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+      
+      this.isLoading = false;
+      this.closeAdvanceModal();
+      
+      Swal.fire({
+        title: 'Success',
+        html: `Advance payment of ₹${formValue.amount.toFixed(2)} added successfully!<br><small>Total advance: ₹${totalAdvance.toFixed(2)}</small>`,
+        icon: 'success'
+      });
+    }, 500);
+  }
+
+  getTotalAdvance(data: PreSales): number {
+    if (!data.advancePayments || data.advancePayments.length === 0) return 0;
+    return data.advancePayments.reduce((sum, adv) => sum + adv.amount, 0);
   }
 
   onGridReady(params: GridReadyEvent): void {
