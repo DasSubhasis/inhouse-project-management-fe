@@ -4,7 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, GridReadyEvent, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import Swal from 'sweetalert2';
-import { PreSales } from '../../core/models/pre-sales.model';
+import { PreSales, ScopeVersion } from '../../core/models/pre-sales.model';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -21,8 +21,11 @@ export class PreSalesComponent implements OnInit {
   isLoading = false;
   isEditMode = false;
   editingIndex: number = -1;
+  editingRecord: PreSales | null = null;
   isDragging = false;
   selectedFiles: File[] = [];
+  currentUserName = 'Admin User'; // This should come from auth service
+  scopeHistoryExpanded = false;
 
   // AG Grid Configuration
   columnDefs: ColDef[] = [
@@ -131,7 +134,33 @@ export class PreSalesComponent implements OnInit {
         emailId: 'rajesh@techsolutions.com',
         agentName: 'Amit Sharma',
         projectValue: 1500000.00,
-        scopeOfDevelopment: 'Complete ERP system with inventory, accounting, and HR modules. Integration with existing systems required.',
+        scopeOfDevelopment: 'Complete ERP system with inventory, accounting, HR, and CRM modules. Integration with existing systems and third-party APIs required. Mobile app support included.',
+        scopeHistory: [
+          {
+            version: 1,
+            scope: 'Basic ERP system with inventory and accounting modules.',
+            modifiedBy: 'Rajesh Kumar',
+            modifiedDate: new Date('2025-11-01T10:30:00')
+          },
+          {
+            version: 2,
+            scope: 'Complete ERP system with inventory, accounting, and HR modules.',
+            modifiedBy: 'Amit Sharma',
+            modifiedDate: new Date('2025-11-15T14:45:00')
+          },
+          {
+            version: 3,
+            scope: 'Complete ERP system with inventory, accounting, and HR modules. Integration with existing systems required.',
+            modifiedBy: 'Admin User',
+            modifiedDate: new Date('2025-12-05T09:20:00')
+          },
+          {
+            version: 4,
+            scope: 'Complete ERP system with inventory, accounting, HR, and CRM modules. Integration with existing systems and third-party APIs required. Mobile app support included.',
+            modifiedBy: 'Amit Sharma',
+            modifiedDate: new Date('2026-01-03T11:15:00')
+          }
+        ],
         attachmentUrls: []
       },
       {
@@ -143,7 +172,27 @@ export class PreSalesComponent implements OnInit {
         emailId: 'priya@globalenterprises.com',
         agentName: 'Neha Gupta',
         projectValue: 850000.00,
-        scopeOfDevelopment: 'Cross-platform mobile application for iOS and Android with backend API integration.',
+        scopeOfDevelopment: 'Cross-platform mobile application for iOS and Android with backend API integration, push notifications, and analytics dashboard.',
+        scopeHistory: [
+          {
+            version: 1,
+            scope: 'Cross-platform mobile application for iOS and Android.',
+            modifiedBy: 'Neha Gupta',
+            modifiedDate: new Date('2025-12-10T16:00:00')
+          },
+          {
+            version: 2,
+            scope: 'Cross-platform mobile application for iOS and Android with backend API integration.',
+            modifiedBy: 'Admin User',
+            modifiedDate: new Date('2025-12-20T13:30:00')
+          },
+          {
+            version: 3,
+            scope: 'Cross-platform mobile application for iOS and Android with backend API integration, push notifications, and analytics dashboard.',
+            modifiedBy: 'Priya Patel',
+            modifiedDate: new Date('2026-01-02T10:00:00')
+          }
+        ],
         attachmentUrls: []
       },
       {
@@ -156,6 +205,14 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Ravi Verma',
         projectValue: 2250000.00,
         scopeOfDevelopment: 'Point of Sale system with inventory management, barcode scanning, and real-time reporting for 50+ stores.',
+        scopeHistory: [
+          {
+            version: 1,
+            scope: 'Point of Sale system with inventory management, barcode scanning, and real-time reporting for 50+ stores.',
+            modifiedBy: 'Ravi Verma',
+            modifiedDate: new Date('2025-12-18T15:20:00')
+          }
+        ],
         attachmentUrls: []
       },
       {
@@ -168,6 +225,14 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Amit Sharma',
         projectValue: 675000.00,
         scopeOfDevelopment: 'LMS with video streaming, assignment management, student tracking, and parent portal.',
+        scopeHistory: [
+          {
+            version: 1,
+            scope: 'LMS with video streaming, assignment management, student tracking, and parent portal.',
+            modifiedBy: 'Amit Sharma',
+            modifiedDate: new Date('2025-12-22T11:00:00')
+          }
+        ],
         attachmentUrls: []
       },
       {
@@ -180,6 +245,14 @@ export class PreSalesComponent implements OnInit {
         agentName: 'Neha Gupta',
         projectValue: 3200000.00,
         scopeOfDevelopment: 'Comprehensive HMS including patient records, appointments, billing, pharmacy, and lab management.',
+        scopeHistory: [
+          {
+            version: 1,
+            scope: 'Comprehensive HMS including patient records, appointments, billing, pharmacy, and lab management.',
+            modifiedBy: 'Neha Gupta',
+            modifiedDate: new Date('2025-12-28T14:30:00')
+          }
+        ],
         attachmentUrls: []
       }
     ];
@@ -213,6 +286,8 @@ export class PreSalesComponent implements OnInit {
     this.selectedFiles = [];
     this.isEditMode = false;
     this.editingIndex = -1;
+    this.editingRecord = null;
+    this.scopeHistoryExpanded = false;
   }
 
   onSubmit(): void {
@@ -232,21 +307,45 @@ export class PreSalesComponent implements OnInit {
       
       if (this.isEditMode && this.editingIndex >= 0) {
         // Update existing record
+        const existingRecord = this.rowData[this.editingIndex];
+        const scopeChanged = existingRecord.scopeOfDevelopment !== formValue.scopeOfDevelopment;
+        
+        // Create new scope version if scope changed
+        let updatedScopeHistory = existingRecord.scopeHistory || [];
+        if (scopeChanged) {
+          const newVersion: ScopeVersion = {
+            version: (updatedScopeHistory.length || 0) + 1,
+            scope: formValue.scopeOfDevelopment,
+            modifiedBy: this.currentUserName,
+            modifiedDate: new Date()
+          };
+          updatedScopeHistory = [...updatedScopeHistory, newVersion];
+        }
+        
         this.rowData[this.editingIndex] = {
-          projectNo: this.rowData[this.editingIndex].projectNo,
+          projectNo: existingRecord.projectNo,
           ...formValue,
           projectValue: parseFloat(formValue.projectValue),
+          scopeHistory: updatedScopeHistory,
           attachmentUrls: []
         };
         
-        Swal.fire('Success', 'Pre-sales record updated successfully', 'success');
+        Swal.fire('Success', 'Pre-sales record updated successfully' + (scopeChanged ? ' (New scope version created)' : ''), 'success');
       } else {
         // Add new record
         const newProjectNo = Math.max(...this.rowData.map(r => r.projectNo)) + 1;
+        const initialScopeVersion: ScopeVersion = {
+          version: 1,
+          scope: formValue.scopeOfDevelopment,
+          modifiedBy: this.currentUserName,
+          modifiedDate: new Date()
+        };
+        
         const newRecord: PreSales = {
           projectNo: newProjectNo,
           ...formValue,
           projectValue: parseFloat(formValue.projectValue),
+          scopeHistory: [initialScopeVersion],
           attachmentUrls: []
         };
         
@@ -307,8 +406,11 @@ export class PreSalesComponent implements OnInit {
             </div>
             
             <div class="border-l-4 border-indigo-500 pl-3 py-1">
-              <p class="text-xs text-gray-500 uppercase font-semibold mb-2">Scope of Development</p>
+              <p class="text-xs text-gray-500 uppercase font-semibold mb-2">Scope of Development (v${data.scopeHistory?.length || 1})</p>
               <p class="text-sm text-gray-700 leading-relaxed bg-gray-50 p-3 rounded">${data.scopeOfDevelopment}</p>
+              ${data.scopeHistory && data.scopeHistory.length > 1 ? 
+                `<button class="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium" id="viewScopeHistory">View Scope History (${data.scopeHistory.length} versions)</button>` 
+                : ''}
             </div>
           </div>
         </div>
@@ -316,6 +418,15 @@ export class PreSalesComponent implements OnInit {
       width: 700,
       showCloseButton: true,
       showConfirmButton: false,
+      didOpen: () => {
+        const historyBtn = document.getElementById('viewScopeHistory');
+        if (historyBtn) {
+          historyBtn.addEventListener('click', () => {
+            Swal.close();
+            this.viewScopeHistory(data);
+          });
+        }
+      },
       customClass: {
         popup: 'rounded-xl shadow-2xl',
         title: 'border-b pb-3',
@@ -327,6 +438,8 @@ export class PreSalesComponent implements OnInit {
   editPreSales(data: PreSales, index: number): void {
     this.isEditMode = true;
     this.editingIndex = index;
+    this.editingRecord = data;
+    this.scopeHistoryExpanded = false;
     
     this.preSalesForm.patchValue({
       partyName: data.partyName,
@@ -400,6 +513,83 @@ export class PreSalesComponent implements OnInit {
   removeFile(index: number): void {
     this.selectedFiles.splice(index, 1);
     this.preSalesForm.patchValue({ attachments: this.selectedFiles });
+  }
+
+  viewScopeHistory(data: PreSales): void {
+    const scopeHistory = data.scopeHistory || [];
+    
+    if (scopeHistory.length === 0) {
+      Swal.fire('No History', 'No scope history available for this project.', 'info');
+      return;
+    }
+    
+    const historyHtml = scopeHistory
+      .slice()
+      .reverse()
+      .map(version => `
+        <div class="mb-4 border-l-4 ${version.version === scopeHistory.length ? 'border-green-500' : 'border-gray-300'} pl-3 py-2 bg-gray-50 rounded">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-bold ${version.version === scopeHistory.length ? 'text-green-600' : 'text-gray-700'}">
+              Version ${version.version} ${version.version === scopeHistory.length ? '(Current)' : ''}
+            </span>
+            <span class="text-xs text-gray-500">
+              ${new Date(version.modifiedDate).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+          </div>
+          <p class="text-xs text-gray-600 mb-1">Modified by: <strong>${version.modifiedBy}</strong></p>
+          <p class="text-sm text-gray-700 leading-relaxed bg-white p-2 rounded border border-gray-200">${version.scope}</p>
+        </div>
+      `)
+      .join('');
+    
+    Swal.fire({
+      title: `<div class="text-left"><strong class="text-xl text-gray-800">Scope History - ${data.projectName}</strong></div>`,
+      html: `
+        <div class="text-left max-h-96 overflow-y-auto">
+          <p class="text-sm text-gray-600 mb-4">Total versions: ${scopeHistory.length}</p>
+          ${historyHtml}
+        </div>
+      `,
+      width: 800,
+      showCloseButton: true,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'rounded-xl shadow-2xl',
+        title: 'border-b pb-3',
+        htmlContainer: 'pt-4'
+      }
+    });
+  }
+
+  viewCurrentScopeHistory(): void {
+    if (this.editingIndex >= 0) {
+      this.viewScopeHistory(this.rowData[this.editingIndex]);
+    }
+  }
+
+  toggleScopeHistoryExpanded(): void {
+    this.scopeHistoryExpanded = !this.scopeHistoryExpanded;
+  }
+
+  getReversedScopeHistory(): ScopeVersion[] {
+    if (!this.editingRecord?.scopeHistory) return [];
+    return [...this.editingRecord.scopeHistory].reverse();
+  }
+
+  formatDate(date: Date): string {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   onGridReady(params: GridReadyEvent): void {

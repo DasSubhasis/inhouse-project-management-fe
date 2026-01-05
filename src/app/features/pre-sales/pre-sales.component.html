@@ -185,6 +185,50 @@
             <p *ngIf="preSalesForm.get('scopeOfDevelopment')?.invalid && preSalesForm.get('scopeOfDevelopment')?.touched" class="text-red-500 text-[10px] mt-0.5">
               Required (min 10 chars)
             </p>
+            <p *ngIf="isEditMode" class="text-blue-600 text-[10px] mt-0.5">
+              ℹ️ Changes to scope will create a new version automatically
+            </p>
+          </div>
+
+          <!-- Scope History (Edit Mode) -->
+          <div *ngIf="isEditMode && editingRecord && editingRecord.scopeHistory && editingRecord.scopeHistory.length > 1" class="col-span-1 md:col-span-3">
+            <div class="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-semibold text-gray-700 uppercase">Scope History ({{ editingRecord.scopeHistory.length }} versions)</h3>
+                <button
+                  type="button"
+                  (click)="toggleScopeHistoryExpanded()"
+                  class="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  {{ scopeHistoryExpanded ? '▼ Collapse' : '▶ Expand All' }}
+                </button>
+              </div>
+              
+              <div *ngIf="scopeHistoryExpanded" class="space-y-2 max-h-64 overflow-y-auto">
+                <div *ngFor="let version of getReversedScopeHistory()" 
+                     [class.border-green-500]="version.version === editingRecord.scopeHistory.length"
+                     [class.border-gray-300]="version.version !== editingRecord.scopeHistory.length"
+                     class="border-l-4 pl-2 py-1.5 bg-white rounded">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="text-xs font-bold" 
+                          [class.text-green-600]="version.version === editingRecord.scopeHistory.length"
+                          [class.text-gray-700]="version.version !== editingRecord.scopeHistory.length">
+                      Version {{ version.version }} 
+                      <span *ngIf="version.version === editingRecord.scopeHistory.length" class="text-green-600">(Current)</span>
+                    </span>
+                    <span class="text-[10px] text-gray-500">
+                      {{ formatDate(version.modifiedDate) }}
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-gray-600 mb-1">By: <strong>{{ version.modifiedBy }}</strong></p>
+                  <p class="text-xs text-gray-700 bg-gray-50 p-1.5 rounded border border-gray-200">{{ version.scope }}</p>
+                </div>
+              </div>
+              
+              <div *ngIf="!scopeHistoryExpanded" class="text-xs text-gray-600">
+                Click "Expand All" to view {{ editingRecord.scopeHistory.length }} versions
+              </div>
+            </div>
           </div>
 
           <!-- Attachments -->

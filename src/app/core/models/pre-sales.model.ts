@@ -1,3 +1,10 @@
+export interface ScopeVersion {
+  version: number;
+  scope: string;
+  modifiedBy: string;
+  modifiedDate: Date;
+}
+
 export interface PreSales {
   projectNo: number;
   partyName: string;
@@ -8,6 +15,7 @@ export interface PreSales {
   agentName: string;
   projectValue: number;
   scopeOfDevelopment: string;
+  scopeHistory?: ScopeVersion[];
   attachments?: File[];
   attachmentUrls?: string[];
 }
