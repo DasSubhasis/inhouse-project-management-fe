@@ -5,6 +5,8 @@ import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, GridReadyEvent, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import Swal from 'sweetalert2';
 import { PreSales, ScopeVersion, StageHistory, ProjectStage, PROJECT_STAGES, AdvancePayment, SerialNumber } from '../../core/models/pre-sales.model';
+import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -28,11 +30,14 @@ export class PreSalesComponent implements OnInit {
   editingRecord: PreSales | null = null;
   selectedProjectForAdvance: PreSales | null = null;
   selectedProjectIndex: number = -1;
+  existingAdvancePayments: any[] = [];
   selectedProjectForSerial: PreSales | null = null;
   selectedProjectIndexForSerial: number = -1;
   isDragging = false;
   selectedFiles: File[] = [];
   currentUserName = 'Admin User'; // This should come from auth service
+  currentUserId: string = '';
+  uploadedAttachmentUrls: string[] = [];
   scopeHistoryExpanded = false;
   projectStages = PROJECT_STAGES;
   stageHistoryExpanded = false;
@@ -42,7 +47,13 @@ export class PreSalesComponent implements OnInit {
     { 
       field: 'projectNo', 
       headerName: 'Project No.', 
-      width: 180
+      width: 200,
+      valueFormatter: (params: any) => {
+        if (params.node.rowPinned) {
+          return '';
+        }
+        return params.value || '';
+      }
     },
     { 
       field: 'projectName', 
@@ -135,10 +146,24 @@ export class PreSalesComponent implements OnInit {
   };
 
   rowData: PreSales[] = [];
-  pinnedBottomRowData: any[] = [];
+  pinnedBottomRowData: any[] = [
+    {
+      projectNo: '',
+      partyName: '',
+      projectName: 'Total',
+      projectValue: 0,
+      currentStage: '',
+      actions: ''
+    }
+  ];
   gridApi: any;
 
-  constructor(private fb: FormBuilder, private ngZone: NgZone) {}
+  constructor(
+    private fb: FormBuilder, 
+    private ngZone: NgZone,
+    private apiService: ApiService,
+    private authService: AuthService
+  ) {}
 
   actionsCellRenderer(params: any): HTMLElement {
     const container = document.createElement('div');
@@ -170,7 +195,7 @@ export class PreSalesComponent implements OnInit {
     deleteBtn.title = 'Delete';
     deleteBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
     deleteBtn.addEventListener('click', () => {
-      this.ngZone.run(() => this.deletePreSales(params.rowIndex));
+      this.ngZone.run(() => this.deletePreSales(params.data));
     });
     
     // Append buttons in order: Serial (conditional), Advance (conditional), View, Edit, Delete
@@ -210,10 +235,86 @@ export class PreSalesComponent implements OnInit {
     this.initForm();
     this.initAdvanceForm();
     this.initSerialForm();
-    this.loadSampleData();
+    this.loadUserInfo();
+    this.loadPreSalesData();
   }
 
-  loadSampleData(): void {
+  loadUserInfo(): void {
+    const user = this.authService.getCurrentUser();
+    if (user) {
+      this.currentUserName = user.name || 'Admin User';
+      this.currentUserId = user.id?.toString() || '';
+    }
+  }
+
+  // Map API response to component data structure
+  mapApiResponseToPreSales(apiData: any): PreSales {
+    return {
+      ...apiData,
+      scopeHistory: apiData.scopeHistory?.map((scope: any) => ({
+        version: scope.version,
+        scope: scope.scope,
+        modifiedBy: scope.modifiedByName || scope.modifiedBy || 'Unknown',
+        modifiedDate: scope.modifiedDate
+      })) || [],
+      stageHistory: apiData.stageHistory?.map((stage: any) => ({
+        stage: stage.stage,
+        changedBy: stage.changedByName || stage.changedBy || 'Unknown',
+        changedDate: stage.changedDate,
+        remarks: stage.remarks
+      })) || [],
+      advancePayments: apiData.advancePayments?.map((payment: any) => ({
+        amount: payment.amount,
+        date: payment.date,
+        tallyEntryNumber: payment.tallyEntryNumber,
+        receivedBy: payment.receivedByName || payment.receivedBy || 'Unknown',
+        receivedDate: payment.receivedDate
+      })) || [],
+      serialNumbers: apiData.serialNumbers?.map((serial: any) => ({
+        serialNumber: serial.serialNumber,
+        version: serial.version,
+        recordedBy: serial.recordedByName || serial.recordedBy || 'Unknown',
+        recordedDate: serial.recordedDate
+      })) || [],
+      attachmentHistory: apiData.attachmentHistory?.map((history: any) => ({
+        attachmentUrls: history.attachmentUrls,
+        uploadedById: history.uploadedById,
+        uploadedByName: history.uploadedByName || 'Unknown',
+        uploadedDate: history.uploadedDate
+      })) || []
+    };
+  }
+
+  loadPreSalesData(): void {
+    this.isLoading = true;
+    this.apiService.getAllPreSales().subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        if (response.success && response.data) {
+          this.rowData = response.data.map((item: any) => this.mapApiResponseToPreSales(item));
+          console.log('Loaded row data:', this.rowData.length, 'rows');
+          // Update total after a brief delay to ensure grid has processed the data
+          setTimeout(() => {
+            this.updateTotalRow();
+          }, 0);
+        } else {
+          console.warn('No data returned from API, using empty array');
+          this.rowData = [];
+          this.updateTotalRow();
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('Error loading pre-sales data:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to load data from server', 'error');
+        this.rowData = [];
+        this.updateTotalRow();
+      }
+    });
+  }
+
+  loadSampleDataOld_REMOVED(): void {
+    // Removed hardcoded data - now using API
     this.rowData = [
       {
         projectNo: '2025-NOV-0001',
@@ -483,11 +584,14 @@ export class PreSalesComponent implements OnInit {
           total += node.data.projectValue;
         }
       });
+      console.log('Total calculated from grid:', total);
     } else {
       // Fallback: calculate from all rows if grid API not available yet
       total = this.rowData.reduce((sum, project) => sum + (project.projectValue || 0), 0);
+      console.log('Total calculated from rowData:', total, 'Row count:', this.rowData.length);
     }
     
+    console.log('Setting pinnedBottomRowData with total:', total);
     this.pinnedBottomRowData = [
       {
         projectNo: '',
@@ -498,6 +602,11 @@ export class PreSalesComponent implements OnInit {
         actions: ''
       }
     ];
+    
+    // Trigger change detection to update the grid
+    if (this.gridApi) {
+      this.gridApi.refreshCells({ force: true });
+    }
   }
 
   initForm(): void {
@@ -535,6 +644,7 @@ export class PreSalesComponent implements OnInit {
     this.editingIndex = -1;
     this.preSalesForm.reset();
     this.selectedFiles = [];
+    this.uploadedAttachmentUrls = [];
     this.isModalOpen = true;
   }
 
@@ -542,6 +652,7 @@ export class PreSalesComponent implements OnInit {
     this.isModalOpen = false;
     this.preSalesForm.reset();
     this.selectedFiles = [];
+    this.uploadedAttachmentUrls = [];
     this.isEditMode = false;
     this.editingIndex = -1;
     this.editingRecord = null;
@@ -558,46 +669,150 @@ export class PreSalesComponent implements OnInit {
     }
 
     this.isLoading = true;
+    console.log('Submitting with uploaded URLs:', this.uploadedAttachmentUrls);
+    
+    // Files already uploaded, just submit the data
+    this.submitPreSalesData();
+  }
 
-    // Simulate API call
-    setTimeout(() => {
-      const formValue = this.preSalesForm.value;
+  uploadFiles(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const uploadPromises = this.selectedFiles.map(file => 
+        this.apiService.uploadPreSalesAttachment(file).toPromise()
+      );
       
-      if (this.isEditMode && this.editingIndex >= 0) {
-        // Update existing record
-        const existingRecord = this.rowData[this.editingIndex];
-        const scopeChanged = existingRecord.scopeOfDevelopment !== formValue.scopeOfDevelopment;
-        const stageChanged = existingRecord.currentStage !== formValue.currentStage;
-        
-        // Check if stage is being reverted
-        const currentStageIndex = PROJECT_STAGES.indexOf(existingRecord.currentStage);
-        const newStageIndex = PROJECT_STAGES.indexOf(formValue.currentStage);
-        
-        if (stageChanged && newStageIndex < currentStageIndex) {
+      Promise.all(uploadPromises)
+        .then((responses) => {
+          const newUrls = responses
+            .filter(res => res?.success && res?.data)
+            .map(res => res.data.fullUrlPath || res.data);
+          // Append new URLs to existing ones
+          this.uploadedAttachmentUrls = [...this.uploadedAttachmentUrls, ...newUrls];
+          resolve();
+        })
+        .catch((error) => {
+          console.error('Error uploading files:', error);
+          reject(error);
+        });
+    });
+  }
+
+  submitPreSalesData(): void {
+    const formValue = this.preSalesForm.value;
+    
+    console.log('Attachment URLs array:', this.uploadedAttachmentUrls);
+    
+    const preSalesData = {
+      partyName: formValue.partyName,
+      projectName: formValue.projectName,
+      contactPerson: formValue.contactPerson,
+      mobileNumber: formValue.mobileNumber,
+      emailId: formValue.emailId,
+      agentName: formValue.agentName,
+      projectValue: formValue.projectValue,
+      scopeOfDevelopment: formValue.scopeOfDevelopment,
+      currentStage: formValue.currentStage,
+      attachmentUrls: this.uploadedAttachmentUrls,
+      userId: this.currentUserId
+    };
+    
+    console.log('Submitting preSalesData:', preSalesData);
+    
+    if (this.isEditMode && this.editingRecord) {
+      // Update existing record
+      const existingRecord = this.editingRecord;
+      const stageChanged = existingRecord.currentStage !== formValue.currentStage;
+      
+      // Check if stage is being reverted
+      const currentStageIndex = PROJECT_STAGES.indexOf(existingRecord.currentStage);
+      const newStageIndex = PROJECT_STAGES.indexOf(formValue.currentStage);
+      
+      if (stageChanged && newStageIndex < currentStageIndex) {
+        this.isLoading = false;
+        Swal.fire('Invalid Stage Change', 'Cannot revert to a previous stage. Stages can only progress forward.', 'error');
+        return;
+      }
+      
+      // Call update API
+      const projectNoNumber = typeof existingRecord.projectNo === 'string' ? parseInt(existingRecord.projectNo, 10) : existingRecord.projectNo;
+      this.apiService.updatePreSales(projectNoNumber, preSalesData).subscribe({
+        next: (response) => {
           this.isLoading = false;
-          Swal.fire('Invalid Stage Change', 'Cannot revert to a previous stage. Stages can only progress forward.', 'error');
-          return;
+          if (response.success) {
+            Swal.fire('Success', response.message || 'Pre-sales record updated successfully', 'success');
+            this.closeModal();
+            this.loadPreSalesData();
+          } else {
+            Swal.fire('Error', response.message || 'Failed to update record', 'error');
+          }
+        },
+        error: (error) => {
+          this.isLoading = false;
+          console.error('Error updating pre-sales:', error);
+          Swal.fire('Error', error.error?.message || 'Failed to update record', 'error');
         }
-        
-        // Create new scope version if scope changed
-        let updatedScopeHistory = existingRecord.scopeHistory || [];
-        if (scopeChanged) {
-          const newVersion: ScopeVersion = {
-            version: (updatedScopeHistory.length || 0) + 1,
-            scope: formValue.scopeOfDevelopment,
-            modifiedBy: this.currentUserName,
-            modifiedDate: new Date()
-          };
-          updatedScopeHistory = [...updatedScopeHistory, newVersion];
+      });
+    } else {
+      // Create new record
+      this.apiService.createPreSales(preSalesData).subscribe({
+        next: (response) => {
+          this.isLoading = false;
+          if (response.success) {
+            Swal.fire('Success', response.message || 'Pre-sales record created successfully', 'success');
+            this.closeModal();
+            this.loadPreSalesData();
+          } else {
+            Swal.fire('Error', response.message || 'Failed to create record', 'error');
+          }
+        },
+        error: (error) => {
+          this.isLoading = false;
+          console.error('Error creating pre-sales:', error);
+          Swal.fire('Error', error.error?.message || 'Failed to create record', 'error');
         }
-        
-        // Create stage history entry if stage changed
-        let updatedStageHistory = existingRecord.stageHistory || [];
-        if (stageChanged) {
-          const newStageEntry: StageHistory = {
-            stage: formValue.currentStage,
-            changedBy: this.currentUserName,
-            changedDate: new Date()
+      });
+    }
+  }
+
+  onSubmitOLD_REMOVED(): void {
+    // OLD HARDCODED LOGIC REMOVED
+    const formValue = this.preSalesForm.value;
+      
+    if (this.isEditMode && this.editingIndex >= 0) {
+      // Update existing record
+      const existingRecord = this.rowData[this.editingIndex];
+      const scopeChanged = existingRecord.scopeOfDevelopment !== formValue.scopeOfDevelopment;
+      const stageChanged = existingRecord.currentStage !== formValue.currentStage;
+      
+      // Check if stage is being reverted
+      const currentStageIndex = PROJECT_STAGES.indexOf(existingRecord.currentStage);
+      const newStageIndex = PROJECT_STAGES.indexOf(formValue.currentStage);
+      
+      if (stageChanged && newStageIndex < currentStageIndex) {
+        this.isLoading = false;
+        Swal.fire('Invalid Stage Change', 'Cannot revert to a previous stage. Stages can only progress forward.', 'error');
+        return;
+      }
+      
+      // Create new scope version if scope changed
+      let updatedScopeHistory = existingRecord.scopeHistory || [];
+      if (scopeChanged) {
+        const newVersion: ScopeVersion = {
+          version: (updatedScopeHistory.length || 0) + 1,
+          scope: formValue.scopeOfDevelopment,
+          modifiedBy: this.currentUserName,
+          modifiedDate: new Date()
+        };
+        updatedScopeHistory = [...updatedScopeHistory, newVersion];
+      }
+      
+      // Create stage history entry if stage changed
+      let updatedStageHistory = existingRecord.stageHistory || [];
+      if (stageChanged) {
+        const newStageEntry: StageHistory = {
+          stage: formValue.currentStage,
+          changedBy: this.currentUserName,
+          changedDate: new Date()
           };
           updatedStageHistory = [...updatedStageHistory, newStageEntry];
         }
@@ -663,35 +878,60 @@ export class PreSalesComponent implements OnInit {
       this.updateTotalRow();
       this.isLoading = false;
       this.closeModal();
-    }, 1000);
+    // OLD setTimeout REMOVED
   }
 
   viewPreSales(data: PreSales): void {
+    // Fetch fresh data from API
+    this.isLoading = true;
+    const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
+    
+    this.apiService.getPreSalesById(projectNoNumber).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        if (response.success && response.data) {
+          const mappedData = this.mapApiResponseToPreSales(response.data);
+          this.showPreSalesDetails(mappedData);
+        } else {
+          Swal.fire('Error', response.message || 'Failed to load project details', 'error');
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('Error loading project details:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to load project details', 'error');
+      }
+    });
+  }
+
+  showPreSalesDetails(data: PreSales): void {
     // Build advance payments section
     let advanceSection = '';
     if (data.advancePayments && data.advancePayments.length > 0) {
       const totalAdvance = data.advancePayments.reduce((sum, adv) => sum + adv.amount, 0);
       advanceSection = `
         <div class="content-section">
-          <h2 class="section-title">💰 Advance Payments <span style="color: #059669; font-size: 1.125rem; margin-left: 16px;">Total: ${totalAdvance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span></h2>
+          <h2 class="section-title">💰 Advance Payments <span style="color: #059669; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">₹${totalAdvance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span></h2>
           <table class="data-table">
             <thead>
               <tr>
-                <th>#</th>
+                <th style="width: 40px;">#</th>
                 <th>Amount</th>
-                <th>Payment Date</th>
+                <th>Date</th>
                 <th>Tally Entry</th>
                 <th>Received By</th>
+                <th>Received Date</th>
               </tr>
             </thead>
             <tbody>
               ${data.advancePayments.map((adv, idx) => `
                 <tr>
-                  <td>${idx + 1}</td>
-                  <td><span class="amount-value">${adv.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span></td>
-                  <td>${new Date(adv.date).toLocaleDateString()}</td>
-                  <td>${adv.tallyEntryNumber}</td>
-                  <td>${adv.receivedBy}</td>
+                  <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+                  <td><span class="amount-value">₹${adv.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span></td>
+                  <td>${new Date(adv.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td style="font-family: monospace; font-size: 0.75rem;">${adv.tallyEntryNumber}</td>
+                  <td style="color: #475569;">${adv.receivedBy}</td>
+                  <td style="color: #64748b; font-size: 0.75rem;">${new Date(adv.receivedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -699,7 +939,7 @@ export class PreSalesComponent implements OnInit {
         </div>
       `;
     } else {
-      advanceSection = '<div class="empty-state"><div class="empty-icon">💰</div><div class="empty-text">No advance payments recorded</div><div class="empty-subtext">Payments will appear here once they are added</div></div>';
+      advanceSection = '<div class="empty-state"><div class="empty-icon">💰</div><div class="empty-text">No advance payments recorded</div><div class="empty-subtext">Payments will appear here once added</div></div>';
     }
     
     // Build serial numbers section
@@ -707,25 +947,25 @@ export class PreSalesComponent implements OnInit {
     if (data.serialNumbers && data.serialNumbers.length > 0) {
       serialSection = `
         <div class="content-section">
-          <h2 class="section-title">🔢 Serial Numbers <span style="color: #3b82f6; font-size: 1.125rem; margin-left: 16px;">Total: ${data.serialNumbers.length}</span></h2>
+          <h2 class="section-title">🔢 Serial Numbers <span style="color: #7c3aed; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">${data.serialNumbers.length} items</span></h2>
           <table class="data-table">
             <thead>
               <tr>
-                <th>#</th>
+                <th style="width: 40px;">#</th>
                 <th>Serial Number</th>
                 <th>Version</th>
                 <th>Recorded By</th>
-                <th>Recorded Date</th>
+                <th>Date</th>
               </tr>
             </thead>
             <tbody>
               ${data.serialNumbers.map((serial, idx) => `
                 <tr>
-                  <td>${idx + 1}</td>
-                  <td><span style="font-weight: 700; color: #3b82f6;">${serial.serialNumber}</span></td>
-                  <td>${serial.version || 'N/A'}</td>
-                  <td>${serial.recordedBy}</td>
-                  <td>${new Date(serial.recordedDate).toLocaleDateString()}</td>
+                  <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+                  <td><span style="font-weight: 700; color: #7c3aed; font-family: monospace; font-size: 0.813rem;">${serial.serialNumber}</span></td>
+                  <td><span class="badge badge-version">${serial.version || 'N/A'}</span></td>
+                  <td style="color: #475569;">${serial.recordedBy}</td>
+                  <td style="color: #64748b; font-size: 0.75rem;">${new Date(serial.recordedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -733,7 +973,7 @@ export class PreSalesComponent implements OnInit {
         </div>
       `;
     } else {
-      serialSection = '<div class="empty-state"><div class="empty-icon">🔢</div><div class="empty-text">No serial numbers assigned</div><div class="empty-subtext">Serial numbers will be listed here after assignment</div></div>';
+      serialSection = '<div class="empty-state"><div class="empty-icon">🔢</div><div class="empty-text">No serial numbers assigned</div><div class="empty-subtext">Serial numbers will be listed after assignment</div></div>';
     }
     
     // Build stage history section
@@ -741,15 +981,15 @@ export class PreSalesComponent implements OnInit {
     if (data.stageHistory && data.stageHistory.length > 0) {
       stageSection = `
         <div class="content-section">
-          <h2 class="section-title">📊 Stage History <span style="color: #10b981; font-size: 1.125rem; margin-left: 16px;">Current: ${data.currentStage}</span></h2>
+          <h2 class="section-title">📊 Stage History <span style="color: #10b981; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">Current: ${data.currentStage}</span></h2>
           <div class="timeline-list">
             ${data.stageHistory.slice().reverse().map((stage, idx) => `
               <div class="timeline-item ${idx === 0 ? 'current' : ''}">
                 <div class="timeline-header">
-                  <div class="timeline-title">${stage.stage}</div>
-                  <div class="timeline-date">${new Date(stage.changedDate).toLocaleDateString()}</div>
+                  <div class="timeline-title">${stage.stage} ${idx === 0 ? '<span class="badge badge-current" style="margin-left: 8px;">CURRENT</span>' : ''}</div>
+                  <div class="timeline-date">${new Date(stage.changedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                 </div>
-                <div class="timeline-meta">Changed by: ${stage.changedBy}</div>
+                <div class="timeline-meta">By ${stage.changedBy}</div>
                 ${stage.remarks ? '<div class="timeline-content">' + stage.remarks + '</div>' : ''}
               </div>
             `).join('')}
@@ -764,22 +1004,85 @@ export class PreSalesComponent implements OnInit {
       const totalVersions = data.scopeHistory.length;
       scopeSection = `
         <div class="content-section">
-          <h2 class="section-title">📄 Scope Versions <span style="color: #3b82f6; font-size: 1.125rem; margin-left: 16px;">Total: ${totalVersions}</span></h2>
+          <h2 class="section-title">📄 Scope Versions <span style="color: #7c3aed; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">${totalVersions} versions</span></h2>
           <div class="timeline-list">
             ${data.scopeHistory.slice().reverse().map((scope, idx) => `
               <div class="timeline-item ${idx === 0 ? 'current' : ''}">
                 <div class="timeline-header">
                   <div class="timeline-title">
                     Version ${scope.version}
-                    ${idx === 0 ? '<span class="badge badge-current" style="margin-left: 12px;">CURRENT</span>' : '<span class="badge badge-version" style="margin-left: 12px;">v' + scope.version + '</span>'}
+                    ${idx === 0 ? '<span class="badge badge-current" style="margin-left: 8px;">CURRENT</span>' : '<span class="badge badge-version" style="margin-left: 8px;">v' + scope.version + '</span>'}
                   </div>
-                  <div class="timeline-date">${new Date(scope.modifiedDate).toLocaleDateString()}</div>
+                  <div class="timeline-date">${new Date(scope.modifiedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                 </div>
-                <div class="timeline-meta">Modified by: ${scope.modifiedBy}</div>
+                <div class="timeline-meta">Modified by ${scope.modifiedBy}</div>
                 <div class="timeline-content">${scope.scope}</div>
               </div>
             `).join('')}
           </div>
+        </div>
+      `;    }
+    
+    // Build attachments section
+    let attachmentsSection = '';
+    if (data.attachmentHistory && data.attachmentHistory.length > 0) {
+      const totalFiles = data.attachmentHistory.reduce((sum: number, history: any) => 
+        sum + (history.attachmentUrls?.length || 0), 0);
+      
+      attachmentsSection = `
+        <div class="content-section">
+          <h2 class="section-title">📎 Attachments <span style="color: #7c3aed; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">${totalFiles} file${totalFiles !== 1 ? 's' : ''}</span></h2>
+          ${data.attachmentHistory.map((history: any, historyIdx: number) => {
+            const uploadDate = history.uploadedDate ? new Date(history.uploadedDate).toLocaleString('en-IN', { 
+              day: '2-digit', 
+              month: 'short', 
+              year: 'numeric', 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }) : '';
+            
+            return `
+              <div class="upload-batch" style="margin-bottom: ${historyIdx < (data.attachmentHistory?.length || 0) - 1 ? '20px' : '0'};">
+                <div class="upload-meta" style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #7c3aed;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 0.813rem; font-weight: 600; color: #1e293b;">
+                      <svg width="14" height="14" style="display: inline-block; vertical-align: middle; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                      </svg>
+                      ${history.uploadedByName || 'Unknown User'}
+                    </div>
+                    <div style="font-size: 0.688rem; color: #64748b; margin-top: 2px;">
+                      <svg width="12" height="12" style="display: inline-block; vertical-align: middle; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      ${uploadDate}
+                    </div>
+                  </div>
+                  <div style="font-size: 0.75rem; font-weight: 700; color: #7c3aed; background: #ede9fe; padding: 4px 10px; border-radius: 12px;">
+                    ${history.attachmentUrls?.length || 0} file${(history.attachmentUrls?.length || 0) !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div class="attachments-grid">
+                  ${(history.attachmentUrls || []).map((url: string, idx: number) => {
+                    const fileName = url.split('/').pop() || `Attachment ${idx + 1}`;
+                    return `
+                      <a href="${url}" target="_blank" rel="noopener noreferrer" class="attachment-card">
+                        <div class="attachment-icon">
+                          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                          </svg>
+                        </div>
+                        <div class="attachment-info">
+                          <div class="attachment-name">${fileName}</div>
+                          <div class="attachment-action">Click to open</div>
+                        </div>
+                      </a>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
     }
@@ -788,63 +1091,83 @@ export class PreSalesComponent implements OnInit {
       html: `
         <style>
           .swal2-popup.fullscreen-modal {
-            width: 96vw !important;
-            max-width: 1600px !important;
-            height: 92vh !important;
+            width: 98vw !important;
+            max-width: 1800px !important;
+            height: 95vh !important;
             margin: 0 !important;
             padding: 0 !important;
-            background: #ffffff !important;
-            border-radius: 16px !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+            background: #1e293b !important;
+            border-radius: 12px !important;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important;
+            overflow: hidden !important;
           }
           .swal2-popup.fullscreen-modal .swal2-html-container {
             height: 100% !important;
             overflow: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
+            display: block !important;
+          }
+          .swal2-popup.fullscreen-modal .swal2-title,
+          .swal2-popup.fullscreen-modal .swal2-header {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 0 !important;
+          }
+          .swal2-popup.fullscreen-modal .swal2-actions {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .modal-layout {
             display: flex;
             flex-direction: column;
-            height: 100%;
-            background: #fafbfc;
+            height: 100vh;
+            width: 100%;
+            background: #1e293b;
+            margin: 0;
+            padding: 0;
           }
           .modal-header-bar {
             background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-            padding: 24px 32px;
+            padding: 12px 20px;
             border-bottom: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+            margin: 0;
           }
           .project-title {
-            font-size: 1.75rem;
+            font-size: 1.125rem;
             font-weight: 700;
             color: #ffffff;
-            margin: 0 0 16px 0;
+            margin: 0 0 6px 0;
             letter-spacing: -0.025em;
           }
           .header-meta {
             display: flex;
-            gap: 24px;
+            gap: 12px;
             align-items: center;
+            flex-wrap: wrap;
           }
           .meta-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            gap: 6px;
+            padding: 3px 10px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
             backdrop-filter: blur(10px);
           }
           .meta-label {
-            font-size: 0.75rem;
+            font-size: 0.625rem;
             color: rgba(255, 255, 255, 0.8);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
           }
           .meta-value {
-            font-size: 1rem;
+            font-size: 0.813rem;
             color: #ffffff;
             font-weight: 700;
           }
@@ -854,37 +1177,37 @@ export class PreSalesComponent implements OnInit {
             overflow: hidden;
           }
           .sidebar-nav {
-            width: 220px;
+            width: 180px;
             background: #ffffff;
             border-right: 1px solid #e2e8f0;
-            padding: 24px 0;
+            padding: 16px 0;
             overflow-y: auto;
           }
           .nav-item {
-            padding: 12px 24px;
+            padding: 8px 16px;
             cursor: pointer;
             color: #64748b;
-            font-size: 0.938rem;
+            font-size: 0.813rem;
             font-weight: 500;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.15s ease;
             border-left: 3px solid transparent;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
           }
           .nav-item:hover {
             background: #f8fafc;
             color: #334155;
           }
           .nav-item.active {
-            background: #f1f5f9;
-            color: #1e293b;
-            border-left-color: #3b82f6;
+            background: #ede9fe;
+            color: #5b21b6;
+            border-left-color: #7c3aed;
             font-weight: 600;
           }
           .nav-icon {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             opacity: 0.6;
           }
           .nav-item.active .nav-icon {
@@ -893,12 +1216,12 @@ export class PreSalesComponent implements OnInit {
           .main-content {
             flex: 1;
             overflow-y: auto;
-            padding: 32px;
-            background: #fafbfc;
+            padding: 20px;
+            background: #f8fafc;
           }
           .tab-panel {
             display: none;
-            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideUp 0.2s ease;
           }
           .tab-panel.active {
             display: block;
@@ -906,7 +1229,7 @@ export class PreSalesComponent implements OnInit {
           @keyframes slideUp {
             from {
               opacity: 0;
-              transform: translateY(20px);
+              transform: translateY(10px);
             }
             to {
               opacity: 1;
@@ -915,130 +1238,132 @@ export class PreSalesComponent implements OnInit {
           }
           .content-section {
             background: #ffffff;
-            border-radius: 12px;
-            padding: 28px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-            margin-bottom: 24px;
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
           }
           .section-title {
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 700;
             color: #1e293b;
-            margin: 0 0 20px 0;
-            padding-bottom: 12px;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
             border-bottom: 2px solid #f1f5f9;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
           }
           .info-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
           }
           .field-group {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
           }
           .field-label {
-            font-size: 0.813rem;
+            font-size: 0.688rem;
             font-weight: 600;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.025em;
           }
           .field-value {
-            font-size: 1rem;
+            font-size: 0.875rem;
             color: #0f172a;
             font-weight: 500;
-            padding: 10px 14px;
+            padding: 6px 10px;
             background: #f8fafc;
-            border-radius: 6px;
+            border-radius: 4px;
             border: 1px solid #e2e8f0;
           }
           .timeline-list {
             position: relative;
-            padding-left: 32px;
+            padding-left: 24px;
           }
           .timeline-list::before {
             content: '';
             position: absolute;
-            left: 8px;
-            top: 8px;
-            bottom: 8px;
+            left: 6px;
+            top: 6px;
+            bottom: 6px;
             width: 2px;
-            background: linear-gradient(to bottom, #3b82f6, #e2e8f0);
+            background: linear-gradient(to bottom, #7c3aed, #e2e8f0);
           }
           .timeline-item {
             position: relative;
-            padding: 16px 20px;
-            margin-bottom: 16px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
             background: #ffffff;
-            border-radius: 8px;
+            border-radius: 6px;
             border: 1px solid #e2e8f0;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
           }
           .timeline-item:hover {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transform: translateX(4px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            transform: translateX(3px);
           }
           .timeline-item::before {
             content: '';
             position: absolute;
-            left: -24px;
-            top: 24px;
-            width: 12px;
-            height: 12px;
-            background: #3b82f6;
-            border: 3px solid #ffffff;
+            left: -18px;
+            top: 16px;
+            width: 10px;
+            height: 10px;
+            background: #7c3aed;
+            border: 2px solid #ffffff;
             border-radius: 50%;
-            box-shadow: 0 0 0 3px #dbeafe;
+            box-shadow: 0 0 0 2px #ddd6fe;
           }
           .timeline-item.current::before {
             background: #10b981;
-            box-shadow: 0 0 0 3px #d1fae5;
+            box-shadow: 0 0 0 2px #d1fae5;
           }
           .timeline-header {
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
           }
           .timeline-title {
-            font-size: 1rem;
+            font-size: 0.875rem;
             font-weight: 700;
             color: #1e293b;
           }
           .timeline-date {
-            font-size: 0.813rem;
+            font-size: 0.75rem;
             color: #64748b;
             font-weight: 500;
           }
           .timeline-meta {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: #64748b;
           }
           .timeline-content {
-            font-size: 0.938rem;
+            font-size: 0.813rem;
             color: #475569;
-            line-height: 1.6;
-            margin-top: 12px;
-            padding-top: 12px;
+            line-height: 1.5;
+            margin-top: 8px;
+            padding-top: 8px;
             border-top: 1px solid #f1f5f9;
           }
           .data-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
+            font-size: 0.813rem;
           }
           .data-table thead {
             background: #f8fafc;
           }
           .data-table th {
-            padding: 12px 16px;
+            padding: 8px 12px;
             text-align: left;
-            font-size: 0.813rem;
+            font-size: 0.688rem;
             font-weight: 700;
             color: #475569;
             text-transform: uppercase;
@@ -1046,13 +1371,13 @@ export class PreSalesComponent implements OnInit {
             border-bottom: 2px solid #e2e8f0;
           }
           .data-table td {
-            padding: 16px;
+            padding: 10px 12px;
             border-bottom: 1px solid #f1f5f9;
-            font-size: 0.938rem;
+            font-size: 0.813rem;
             color: #1e293b;
           }
           .data-table tbody tr {
-            transition: background 0.15s ease;
+            transition: background 0.1s ease;
           }
           .data-table tbody tr:hover {
             background: #f8fafc;
@@ -1060,14 +1385,14 @@ export class PreSalesComponent implements OnInit {
           .amount-value {
             font-weight: 700;
             color: #059669;
-            font-size: 1rem;
+            font-size: 0.875rem;
           }
           .badge {
             display: inline-flex;
             align-items: center;
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 0.813rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.688rem;
             font-weight: 600;
             letter-spacing: 0.025em;
           }
@@ -1076,28 +1401,78 @@ export class PreSalesComponent implements OnInit {
             color: #065f46;
           }
           .badge-version {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #ddd6fe;
+            color: #5b21b6;
           }
           .empty-state {
             text-align: center;
-            padding: 80px 24px;
+            padding: 50px 20px;
             color: #94a3b8;
           }
           .empty-icon {
-            font-size: 4rem;
-            margin-bottom: 16px;
+            font-size: 3rem;
+            margin-bottom: 12px;
             opacity: 0.4;
           }
           .empty-text {
-            font-size: 1.125rem;
+            font-size: 0.938rem;
             font-weight: 600;
             color: #64748b;
           }
           .empty-subtext {
-            font-size: 0.938rem;
+            font-size: 0.813rem;
             color: #94a3b8;
-            margin-top: 8px;
+            margin-top: 6px;
+          }
+          .attachments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+          }
+          .attachment-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            cursor: pointer;
+          }
+          .attachment-card:hover {
+            border-color: #7c3aed;
+            box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15);
+            transform: translateY(-2px);
+          }
+          .attachment-icon {
+            flex-shrink: 0;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f3f4f6;
+            border-radius: 6px;
+            color: #7c3aed;
+          }
+          .attachment-info {
+            flex: 1;
+            min-width: 0;
+          }
+          .attachment-name {
+            font-size: 0.813rem;
+            font-weight: 600;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .attachment-action {
+            font-size: 0.688rem;
+            color: #64748b;
+            margin-top: 2px;
           }
         </style>
         <div class="modal-layout">
@@ -1146,6 +1521,10 @@ export class PreSalesComponent implements OnInit {
               <div class="nav-item" data-tab="serial">
                 <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>
                 <span>Serial Numbers</span>
+              </div>
+              <div class="nav-item" data-tab="attachments">
+                <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                <span>Attachments</span>
               </div>
             </div>
             
@@ -1197,6 +1576,10 @@ export class PreSalesComponent implements OnInit {
             <div id="serial" class="tab-panel">
               ${serialSection}
             </div>
+            
+            <div id="attachments" class="tab-panel">
+              ${attachmentsSection}
+            </div>
             </div>
           </div>
         </div>
@@ -1241,6 +1624,24 @@ export class PreSalesComponent implements OnInit {
     this.scopeHistoryExpanded = false;
     this.stageHistoryExpanded = false;
     
+    // Preserve existing attachment URLs (handle both array and comma-separated string)
+    if (data.attachmentUrls) {
+      if (Array.isArray(data.attachmentUrls)) {
+        this.uploadedAttachmentUrls = [...data.attachmentUrls];
+      } else {
+        const urlString = data.attachmentUrls as any as string;
+        if (urlString && urlString.length > 0) {
+          this.uploadedAttachmentUrls = urlString.split(',').map((url: string) => url.trim());
+        } else {
+          this.uploadedAttachmentUrls = [];
+        }
+      }
+    } else {
+      this.uploadedAttachmentUrls = [];
+    }
+    console.log('Edit mode - existing URLs:', this.uploadedAttachmentUrls);
+    this.selectedFiles = [];
+    
     this.preSalesForm.patchValue({
       partyName: data.partyName,
       projectName: data.projectName,
@@ -1256,7 +1657,7 @@ export class PreSalesComponent implements OnInit {
     this.isModalOpen = true;
   }
 
-  deletePreSales(index: number): void {
+  deletePreSales(data: PreSales): void {
     Swal.fire({
       title: 'Are you sure?',
       text: 'Do you want to delete this pre-sales record?',
@@ -1268,14 +1669,24 @@ export class PreSalesComponent implements OnInit {
     }).then((result) => {
       if (result.isConfirmed) {
         this.isLoading = true;
+        const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
         
-        setTimeout(() => {
-          this.rowData = this.rowData.filter((_, i) => i !== index);
-          this.updateTotalRow();
-          this.isLoading = false;
-          
-          Swal.fire('Deleted!', 'Pre-sales record has been deleted.', 'success');
-        }, 500);
+        this.apiService.deletePreSales(projectNoNumber, this.currentUserId).subscribe({
+          next: (response) => {
+            this.isLoading = false;
+            if (response.success) {
+              Swal.fire('Success', response.message || 'Pre-sales record deleted successfully', 'success');
+              this.loadPreSalesData();
+            } else {
+              Swal.fire('Error', response.message || 'Failed to delete record', 'error');
+            }
+          },
+          error: (error) => {
+            this.isLoading = false;
+            console.error('Error deleting pre-sales:', error);
+            Swal.fire('Error', error.error?.message || 'Failed to delete record', 'error');
+          }
+        });
       }
     });
   }
@@ -1283,9 +1694,16 @@ export class PreSalesComponent implements OnInit {
   onFileChange(event: any): void {
     const files = event.target.files;
     if (files && files.length > 0) {
-      this.selectedFiles = Array.from(files);
-      this.preSalesForm.patchValue({ attachments: this.selectedFiles });
+      console.log('Files selected:', files.length);
+      const newFiles = Array.from(files) as File[];
+      this.selectedFiles = [...this.selectedFiles, ...newFiles];
+      console.log('Total files now:', this.selectedFiles.length);
+      
+      // Upload immediately
+      this.uploadFilesImmediately(newFiles);
     }
+    // Reset input to allow selecting same file again
+    event.target.value = '';
   }
 
   onDragOver(event: DragEvent): void {
@@ -1307,14 +1725,49 @@ export class PreSalesComponent implements OnInit {
 
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
-      this.selectedFiles = Array.from(files);
-      this.preSalesForm.patchValue({ attachments: this.selectedFiles });
+      console.log('Files dropped:', files.length);
+      const newFiles = Array.from(files) as File[];
+      this.selectedFiles = [...this.selectedFiles, ...newFiles];
+      console.log('Total files now:', this.selectedFiles.length);
+      
+      // Upload immediately
+      this.uploadFilesImmediately(newFiles);
     }
   }
 
+  uploadFilesImmediately(files: File[]): void {
+    console.log('Uploading files immediately:', files.length);
+    const uploadPromises = files.map(file => {
+      console.log('Uploading file:', file.name);
+      return this.apiService.uploadPreSalesAttachment(file).toPromise();
+    });
+    
+    Promise.all(uploadPromises)
+      .then((responses) => {
+        console.log('Upload responses:', responses);
+        const newUrls = responses
+          .filter(res => res && (res.fullUrlPath || res.data?.fullUrlPath))
+          .map(res => {
+            // Handle direct response or nested in data
+            const url = res.fullUrlPath || res.data?.fullUrlPath || res.data;
+            console.log('Extracted URL:', url);
+            return url;
+          });
+        
+        this.uploadedAttachmentUrls = [...this.uploadedAttachmentUrls, ...newUrls];
+        console.log('Total uploaded URLs:', this.uploadedAttachmentUrls.length, this.uploadedAttachmentUrls);
+      })
+      .catch((error) => {
+        console.error('Error uploading files:', error);
+        Swal.fire('Upload Error', 'Failed to upload some files', 'error');
+      });
+  }
+
   removeFile(index: number): void {
+    console.log('Removing file at index:', index);
     this.selectedFiles.splice(index, 1);
-    this.preSalesForm.patchValue({ attachments: this.selectedFiles });
+    this.uploadedAttachmentUrls.splice(index, 1);
+    console.log('Files remaining:', this.selectedFiles.length, 'URLs remaining:', this.uploadedAttachmentUrls.length);
   }
 
   viewScopeHistory(data: PreSales): void {
@@ -1416,13 +1869,34 @@ export class PreSalesComponent implements OnInit {
     this.selectedProjectForAdvance = data;
     this.selectedProjectIndex = index;
     this.advanceForm.reset();
+    this.existingAdvancePayments = [];
     this.isAdvanceModalOpen = true;
+    
+    // Fetch existing advance payments from API
+    const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
+    this.apiService.getAdvancePayments(projectNoNumber).subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          this.existingAdvancePayments = response.data.map((payment: any) => ({
+            amount: payment.amount,
+            date: payment.date,
+            tallyEntryNumber: payment.tallyEntryNumber,
+            receivedBy: payment.receivedByName || payment.receivedBy || 'Unknown',
+            receivedDate: payment.receivedDate
+          }));
+        }
+      },
+      error: (error) => {
+        console.error('Error loading advance payments:', error);
+      }
+    });
   }
 
   closeAdvanceModal(): void {
     this.isAdvanceModalOpen = false;
     this.selectedProjectForAdvance = null;
     this.selectedProjectIndex = -1;
+    this.existingAdvancePayments = [];
     this.advanceForm.reset();
   }
 
@@ -1435,48 +1909,80 @@ export class PreSalesComponent implements OnInit {
       return;
     }
 
-    if (this.selectedProjectIndex < 0) {
+    if (!this.selectedProjectForAdvance) {
       Swal.fire('Error', 'No project selected', 'error');
       return;
     }
 
     this.isLoading = true;
+    const formValue = this.advanceForm.value;
+    
+    const paymentData = {
+      amount: parseFloat(formValue.amount),
+      paymentDate: formValue.date,
+      tallyEntryNumber: formValue.tallyEntryNumber,
+      userId: this.currentUserId
+    };
 
-    setTimeout(() => {
-      const formValue = this.advanceForm.value;
-      const existingRecord = this.rowData[this.selectedProjectIndex];
-      
-      const newAdvance: AdvancePayment = {
-        amount: parseFloat(formValue.amount),
-        date: new Date(formValue.date),
-        tallyEntryNumber: formValue.tallyEntryNumber,
-        receivedBy: this.currentUserName,
-        receivedDate: new Date()
-      };
+    const projectNoNumber = typeof this.selectedProjectForAdvance.projectNo === 'string' 
+      ? parseInt(this.selectedProjectForAdvance.projectNo, 10) 
+      : this.selectedProjectForAdvance.projectNo;
 
-      const updatedAdvances = [...(existingRecord.advancePayments || []), newAdvance];
-      
-      this.rowData[this.selectedProjectIndex] = {
-        ...existingRecord,
-        advancePayments: updatedAdvances
-      };
-
-      const totalAdvance = updatedAdvances.reduce((sum, adv) => sum + adv.amount, 0);
-      
-      this.isLoading = false;
-      this.closeAdvanceModal();
-      
-      Swal.fire({
-        title: 'Success',
-        html: 'Advance payment of Rs. ' + formValue.amount.toFixed(2) + ' added successfully!<br><small>Total advance: Rs. ' + totalAdvance.toFixed(2) + '</small>',
-        icon: 'success'
-      });
-    }, 500);
+    this.apiService.addAdvancePayment(projectNoNumber, paymentData).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        if (response.success) {
+          // Reset form for next payment
+          this.advanceForm.reset();
+          
+          // Reload the advance payments list
+          this.apiService.getAdvancePayments(projectNoNumber).subscribe({
+            next: (paymentsResponse) => {
+              if (paymentsResponse.success && paymentsResponse.data) {
+                this.existingAdvancePayments = paymentsResponse.data.map((payment: any) => ({
+                  amount: payment.amount,
+                  date: payment.date,
+                  tallyEntryNumber: payment.tallyEntryNumber,
+                  receivedBy: payment.receivedByName || payment.receivedBy || 'Unknown',
+                  receivedDate: payment.receivedDate
+                }));
+              }
+            }
+          });
+          
+          Swal.fire({
+            title: 'Success',
+            html: `Payment of ₹${formValue.amount.toFixed(2)} added successfully!`,
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+          });
+          
+          this.loadPreSalesData();
+        } else {
+          Swal.fire('Error', response.message || 'Failed to add advance payment', 'error');
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('Error adding advance payment:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to add advance payment', 'error');
+      }
+    });
   }
 
   getTotalAdvance(data: PreSales): number {
     if (!data.advancePayments || data.advancePayments.length === 0) return 0;
     return data.advancePayments.reduce((sum, adv) => sum + adv.amount, 0);
+  }
+
+  getTotalAdvanceFromList(payments: any[]): number {
+    if (!payments || payments.length === 0) return 0;
+    return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  }
+
+  formatCurrency(amount: number): string {
+    return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   openSerialModal(data: PreSales, index: number): void {
@@ -1539,6 +2045,8 @@ export class PreSalesComponent implements OnInit {
   onGridReady(params: GridReadyEvent): void {
     this.gridApi = params.api;
     params.api.sizeColumnsToFit();
+    // Recalculate total after grid is ready
+    this.updateTotalRow();
   }
 
   onFilterChanged(): void {

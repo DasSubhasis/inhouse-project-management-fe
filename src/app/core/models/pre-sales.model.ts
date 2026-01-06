@@ -27,6 +27,13 @@ export interface SerialNumber {
   recordedDate: Date;
 }
 
+export interface AttachmentHistory {
+  attachmentUrls: string[];
+  uploadedById: string;
+  uploadedByName: string;
+  uploadedDate: string;
+}
+
 export type ProjectStage = 'Pre-Sales' | 'Quotation' | 'Confirmed' | 'Development' | 'Completed';
 
 export const PROJECT_STAGES: ProjectStage[] = ['Pre-Sales', 'Quotation', 'Confirmed'];
@@ -48,4 +55,5 @@ export interface PreSales {
   serialNumbers?: SerialNumber[];
   attachments?: File[];
   attachmentUrls?: string[];
+  attachmentHistory?: AttachmentHistory[];
 }

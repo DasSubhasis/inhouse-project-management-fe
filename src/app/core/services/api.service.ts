@@ -583,6 +583,96 @@ export class ApiService {
     return this.http.delete<any>(`${this.baseUrl}/UploadedFile/delete/${fileDataId}`, { params });
   }
 
+  // ============ PRE-SALES ENDPOINTS ============
+
+  /**
+   * Upload attachment file for pre-sales
+   */
+  uploadPreSalesAttachment(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('File', file);
+    return this.http.post<any>(`${this.baseUrl}/PreSales/logo`, formData);
+  }
+
+  /**
+   * Get all pre-sales projects
+   */
+  getAllPreSales(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/PreSales/getall`);
+  }
+
+  /**
+   * Get a single pre-sales project by project number
+   */
+  getPreSalesById(projectNo: number | string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/PreSales/${projectNo}`);
+  }
+
+  /**
+   * Create a new pre-sales project
+   */
+  createPreSales(preSalesData: {
+    partyName: string;
+    projectName: string;
+    contactPerson: string;
+    mobileNumber: string;
+    emailId: string;
+    agentName: string;
+    projectValue: number;
+    scopeOfDevelopment: string;
+    currentStage: string;
+    attachmentUrls: string[];
+    userId: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/PreSales/create`, preSalesData);
+  }
+
+  /**
+   * Update an existing pre-sales project
+   */
+  updatePreSales(projectNo: number, preSalesData: {
+    partyName: string;
+    projectName: string;
+    contactPerson: string;
+    mobileNumber: string;
+    emailId: string;
+    agentName: string;
+    projectValue: number;
+    scopeOfDevelopment: string;
+    currentStage: string;
+    attachmentUrls: string[];
+    userId: string;
+  }): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/PreSales/update/${projectNo}`, preSalesData);
+  }
+
+  /**
+   * Delete a pre-sales project
+   */
+  deletePreSales(projectNo: number, userId: string): Observable<any> {
+    const params = new HttpParams().set('userId', userId);
+    return this.http.delete<any>(`${this.baseUrl}/PreSales/delete/${projectNo}`, { params });
+  }
+
+  /**
+   * Add advance payment to a project
+   */
+  addAdvancePayment(projectNo: number, paymentData: {
+    amount: number;
+    paymentDate: string;
+    tallyEntryNumber: string;
+    userId: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/PreSales/${projectNo}/advance-payment`, paymentData);
+  }
+
+  /**
+   * Get all advance payments for a project
+   */
+  getAdvancePayments(projectNo: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/PreSales/${projectNo}/advance-payments`);
+  }
+
   // ============ GENERIC METHODS ============
 
   /**
