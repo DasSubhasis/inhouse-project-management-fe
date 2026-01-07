@@ -291,8 +291,11 @@ export class PreSalesComponent implements OnInit {
       next: (response) => {
         this.isLoading = false;
         if (response.success && response.data) {
+          console.log('Raw API response data:', response.data);
           this.rowData = response.data.map((item: any) => this.mapApiResponseToPreSales(item));
           console.log('Loaded row data:', this.rowData.length, 'rows');
+          console.log('First row data:', this.rowData[0]);
+          console.log('ProjectValue of first row:', this.rowData[0]?.projectValue);
           // Update total after a brief delay to ensure grid has processed the data
           setTimeout(() => {
             this.updateTotalRow();
@@ -576,21 +579,31 @@ export class PreSalesComponent implements OnInit {
   
   updateTotalRow(): void {
     let total = 0;
-    
+
     if (this.gridApi) {
-      // Calculate total from filtered/displayed rows only
-      this.gridApi.forEachNodeAfterFilter((node: any) => {
-        if (node.data && node.data.projectValue) {
-          total += node.data.projectValue;
-        }
-      });
-      console.log('Total calculated from grid:', total);
+      // Prefer using displayed rows when available
+      const displayedCount = this.gridApi.getDisplayedRowCount ? this.gridApi.getDisplayedRowCount() : 0;
+      if (displayedCount > 0) {
+        this.gridApi.forEachNodeAfterFilter((node: any) => {
+          console.log('Node data:', node.data);
+          if (node.data && node.data.projectValue != null && !isNaN(Number(node.data.projectValue))) {
+            const value = Number(node.data.projectValue);
+            console.log('Adding projectValue:', value, 'Type:', typeof value);
+            total += value;
+          }
+        });
+        console.log('Total calculated from grid:', total, 'Displayed rows:', displayedCount);
+      } else {
+        // Grid exists but hasn't yet populated nodes; fallback to rowData
+        total = this.rowData.reduce((sum, project) => sum + (Number(project.projectValue) || 0), 0);
+        console.log('Grid had no displayed rows; total calculated from rowData:', total, 'Row count:', this.rowData.length);
+      }
     } else {
       // Fallback: calculate from all rows if grid API not available yet
-      total = this.rowData.reduce((sum, project) => sum + (project.projectValue || 0), 0);
+      total = this.rowData.reduce((sum, project) => sum + (Number(project.projectValue) || 0), 0);
       console.log('Total calculated from rowData:', total, 'Row count:', this.rowData.length);
     }
-    
+
     console.log('Setting pinnedBottomRowData with total:', total);
     this.pinnedBottomRowData = [
       {
