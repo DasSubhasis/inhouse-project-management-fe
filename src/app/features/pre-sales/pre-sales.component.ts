@@ -2019,40 +2019,52 @@ export class PreSalesComponent implements OnInit {
       return;
     }
 
-    if (this.selectedProjectIndexForSerial < 0) {
+    if (this.selectedProjectIndexForSerial < 0 || !this.selectedProjectForSerial) {
       Swal.fire('Error', 'No project selected', 'error');
       return;
     }
 
     this.isLoading = true;
 
-    setTimeout(() => {
-      const formValue = this.serialForm.value;
-      const existingRecord = this.rowData[this.selectedProjectIndexForSerial];
-      
-      const newSerial: SerialNumber = {
-        serialNumber: formValue.serialNumber,
-        version: formValue.version || undefined,
-        recordedBy: this.currentUserName,
-        recordedDate: new Date()
-      };
+    const formValue = this.serialForm.value;
+    const projectNo = Number(this.selectedProjectForSerial.projectNo);
+    
+    // Prepare data for API call
+    const serialData = {
+      serialNumber: formValue.serialNumber,
+      version: formValue.version || '',
+      recordedById: this.currentUserId || this.currentUserName,
+      recordedDate: new Date().toISOString()
+    };
 
-      const updatedSerials = [...(existingRecord.serialNumbers || []), newSerial];
-      
-      this.rowData[this.selectedProjectIndexForSerial] = {
-        ...existingRecord,
-        serialNumbers: updatedSerials
-      };
-      
-      this.isLoading = false;
-      this.closeSerialModal();
-      
-      Swal.fire({
-        title: 'Success',
-        html: 'Serial number added successfully!<br><small>Total serials: ' + updatedSerials.length + '</small>',
-        icon: 'success'
-      });
-    }, 500);
+    // Call API to add serial number
+    this.apiService.addSerialNumber(projectNo, serialData).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        
+        if (response.success) {
+          // Close and reset the modal first
+          this.closeSerialModal();
+          
+          // Show success message using API response
+          Swal.fire({
+            title: 'Success',
+            text: response.message || 'Serial number added successfully',
+            icon: 'success'
+          });
+          
+          // Reload data from API to get updated serial numbers
+          this.loadPreSalesData();
+        } else {
+          Swal.fire('Error', response.message || 'Failed to add serial number', 'error');
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('Error adding serial number:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to add serial number', 'error');
+      }
+    });
   }
 
   onGridReady(params: GridReadyEvent): void {

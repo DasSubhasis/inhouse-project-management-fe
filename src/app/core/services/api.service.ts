@@ -673,6 +673,18 @@ export class ApiService {
     return this.http.get<any>(`${this.baseUrl}/PreSales/${projectNo}/advance-payments`);
   }
 
+  /**
+   * Add serial number to a project (quotation endpoint)
+   */
+  addSerialNumber(projectNo: number, serialData: {
+    serialNumber: string;
+    version: string;
+    recordedById: string;
+    recordedDate: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/PreSales/${projectNo}/quotation`, serialData);
+  }
+
   // ============ GENERIC METHODS ============
 
   /**
