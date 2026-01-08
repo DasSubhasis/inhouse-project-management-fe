@@ -42,7 +42,7 @@ export const routes: Routes = [
       },
       {
         path: 'opportunities/development',
-        loadComponent: () => import('./features/home/home.component').then(m => m.HomeComponent) // Placeholder
+        loadComponent: () => import('./features/development/development.component').then(m => m.DevelopmentComponent)
       },
       {
         path: 'opportunities/completed',

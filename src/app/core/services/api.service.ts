@@ -602,6 +602,13 @@ export class ApiService {
   }
 
   /**
+   * Get all confirmed projects (for development)
+   */
+  getAllConfirmedProjects(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/Devlopment/getall-confirmed`);
+  }
+
+  /**
    * Get a single pre-sales project by project number
    */
   getPreSalesById(projectNo: number | string): Observable<any> {

@@ -11,13 +11,13 @@ import { AuthService } from '../../core/services/auth.service';
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 @Component({
-  selector: 'app-pre-sales',
+  selector: 'app-development',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, AgGridAngular],
-  templateUrl: './pre-sales.component.html',
-  styleUrls: ['./pre-sales.component.scss']
+  templateUrl: './development.component.html',
+  styleUrls: ['./development.component.scss']
 })
-export class PreSalesComponent implements OnInit {
+export class DevelopmentComponent implements OnInit {
   preSalesForm!: FormGroup;
   advanceForm!: FormGroup;
   serialForm!: FormGroup;
@@ -47,7 +47,7 @@ export class PreSalesComponent implements OnInit {
     { 
       field: 'projectNo', 
       headerName: 'Project No.', 
-      width: 200,
+      width: 120,
       valueFormatter: (params: any) => {
         if (params.node.rowPinned) {
           return '';
@@ -58,19 +58,19 @@ export class PreSalesComponent implements OnInit {
     { 
       field: 'projectName', 
       headerName: 'Project Name', 
-      flex: 1,
-      minWidth: 200
+      flex: 2,
+      minWidth: 180
     },
     { 
       field: 'partyName', 
       headerName: 'Party Name', 
-      flex: 1,
-      minWidth: 180
+      flex: 2,
+      minWidth: 150
     },
     { 
       field: 'projectValue', 
-      headerName: 'Value', 
-      width: 150,
+      headerName: 'Project Value', 
+      width: 140,
       valueFormatter: (params: any) => {
         if (params.value != null) {
           return params.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -82,7 +82,8 @@ export class PreSalesComponent implements OnInit {
           return { 'font-weight': 'bold', 'background-color': '#f3f4f6', 'text-align': 'right' };
         }
         return { 'text-align': 'right' };
-      }
+      },
+      headerClass: 'ag-right-aligned-header'
     },
     { 
       field: 'currentStage', 
@@ -293,7 +294,7 @@ export class PreSalesComponent implements OnInit {
 
   loadPreSalesData(): void {
     this.isLoading = true;
-    this.apiService.getAllPreSales().subscribe({
+    this.apiService.getAllConfirmedProjects().subscribe({
       next: (response) => {
         this.isLoading = false;
         if (response.success && response.data) {
@@ -329,7 +330,7 @@ export class PreSalesComponent implements OnInit {
       },
       error: (error) => {
         this.isLoading = false;
-        console.error('Error loading pre-sales data:', error);
+        console.error('Error loading confirmed projects data:', error);
         Swal.fire('Error', error.error?.message || 'Failed to load data from server', 'error');
         this.rowData = [];
         this.updateTotalRow();
@@ -1088,6 +1089,70 @@ export class PreSalesComponent implements OnInit {
           </div>
         </div>
       `;    }
+    
+    // Build attachments section
+    let attachmentsSection = '';
+    if (data.attachmentHistory && data.attachmentHistory.length > 0) {
+      const totalFiles = data.attachmentHistory.reduce((sum: number, history: any) => 
+        sum + (history.attachmentUrls?.length || 0), 0);
+      
+      attachmentsSection = `
+        <div class="content-section">
+          <h2 class="section-title">📎 Attachments <span style="color: #7c3aed; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">${totalFiles} file${totalFiles !== 1 ? 's' : ''}</span></h2>
+          ${data.attachmentHistory.map((history: any, historyIdx: number) => {
+            const uploadDate = history.uploadedDate ? new Date(history.uploadedDate).toLocaleString('en-IN', { 
+              day: '2-digit', 
+              month: 'short', 
+              year: 'numeric', 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }) : '';
+            
+            return `
+              <div class="upload-batch" style="margin-bottom: ${historyIdx < (data.attachmentHistory?.length || 0) - 1 ? '20px' : '0'};">
+                <div class="upload-meta" style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #7c3aed;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 0.813rem; font-weight: 600; color: #1e293b;">
+                      <svg width="14" height="14" style="display: inline-block; vertical-align: middle; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                      </svg>
+                      ${history.uploadedByName || 'Unknown User'}
+                    </div>
+                    <div style="font-size: 0.688rem; color: #64748b; margin-top: 2px;">
+                      <svg width="12" height="12" style="display: inline-block; vertical-align: middle; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      ${uploadDate}
+                    </div>
+                  </div>
+                  <div style="font-size: 0.75rem; font-weight: 700; color: #7c3aed; background: #ede9fe; padding: 4px 10px; border-radius: 12px;">
+                    ${history.attachmentUrls?.length || 0} file${(history.attachmentUrls?.length || 0) !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div class="attachments-grid">
+                  ${(history.attachmentUrls || []).map((url: string, idx: number) => {
+                    const fileName = url.split('/').pop() || `Attachment ${idx + 1}`;
+                    return `
+                      <a href="${url}" target="_blank" rel="noopener noreferrer" class="attachment-card">
+                        <div class="attachment-icon">
+                          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                          </svg>
+                        </div>
+                        <div class="attachment-info">
+                          <div class="attachment-name">${fileName}</div>
+                          <div class="attachment-action">Click to open</div>
+                        </div>
+                      </a>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
     
     Swal.fire({
       html: `
