@@ -101,6 +101,11 @@ export class PreSalesComponent implements OnInit {
         // Check if confirmed stage but no serial numbers
         const needsSerial = stage === 'Confirmed' && (!params.data.serialNumbers || params.data.serialNumbers.length === 0);
         
+        // Debug log to check serial numbers
+        if (stage === 'Confirmed') {
+          console.log(`Project ${params.data.projectNo}: serialNumbers count = ${params.data.serialNumbers?.length || 0}`, params.data.serialNumbers);
+        }
+        
         const container = document.createElement('span');
         container.className = `px-2 py-1 text-xs font-medium rounded ${colors[stage] || 'bg-gray-100 text-gray-800'}`;
         container.textContent = stage;
@@ -296,6 +301,21 @@ export class PreSalesComponent implements OnInit {
           console.log('Loaded row data:', this.rowData.length, 'rows');
           console.log('First row data:', this.rowData[0]);
           console.log('ProjectValue of first row:', this.rowData[0]?.projectValue);
+          
+          // Update editingRecord if modal is open in edit mode
+          if (this.isEditMode && this.editingRecord && this.editingRecord.projectNo) {
+            const updatedRecord = this.rowData.find(item => item.projectNo === this.editingRecord?.projectNo);
+            if (updatedRecord) {
+              this.editingRecord = updatedRecord;
+              console.log('Updated editingRecord with fresh data, serialNumbers:', updatedRecord.serialNumbers?.length);
+            }
+          }
+          
+          // Refresh grid cells to update cell renderers (like the stage badge with warning icon)
+          if (this.gridApi) {
+            this.gridApi.refreshCells({ force: true });
+          }
+          
           // Update total after a brief delay to ensure grid has processed the data
           setTimeout(() => {
             this.updateTotalRow();
@@ -928,23 +948,23 @@ export class PreSalesComponent implements OnInit {
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 40px;">#</th>
-                <th>Amount</th>
-                <th>Date</th>
-                <th>Tally Entry</th>
-                <th>Received By</th>
-                <th>Received Date</th>
+                <th style="width: 40px; text-align: center;">#</th>
+                <th style="text-align: right; min-width: 120px;">Amount</th>
+                <th style="text-align: left; min-width: 100px;">Date</th>
+                <th style="text-align: left; min-width: 120px;">Tally Entry</th>
+                <th style="text-align: left; min-width: 140px;">Received By</th>
+                <th style="text-align: left; min-width: 120px;">Received Date</th>
               </tr>
             </thead>
             <tbody>
               ${data.advancePayments.map((adv, idx) => `
                 <tr>
                   <td style="text-align: center; color: #64748b;">${idx + 1}</td>
-                  <td><span class="amount-value">₹${adv.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span></td>
-                  <td>${new Date(adv.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td style="font-family: monospace; font-size: 0.75rem;">${adv.tallyEntryNumber}</td>
-                  <td style="color: #475569;">${adv.receivedBy}</td>
-                  <td style="color: #64748b; font-size: 0.75rem;">${new Date(adv.receivedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td style="text-align: right;"><span class="amount-value">₹${adv.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</span></td>
+                  <td style="text-align: left;">${new Date(adv.date).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td style="text-align: left; font-family: monospace; font-size: 0.75rem;">${adv.tallyEntryNumber}</td>
+                  <td style="text-align: left; color: #475569;">${adv.receivedBy}</td>
+                  <td style="text-align: left; color: #64748b; font-size: 0.75rem;">${new Date(adv.receivedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -964,21 +984,21 @@ export class PreSalesComponent implements OnInit {
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 40px;">#</th>
-                <th>Serial Number</th>
-                <th>Version</th>
-                <th>Recorded By</th>
-                <th>Date</th>
+                <th style="width: 40px; text-align: center;">#</th>
+                <th style="text-align: left; min-width: 180px;">Serial Number</th>
+                <th style="text-align: left; min-width: 100px;">Version</th>
+                <th style="text-align: left; min-width: 150px;">Recorded By</th>
+                <th style="text-align: left; min-width: 120px;">Date</th>
               </tr>
             </thead>
             <tbody>
               ${data.serialNumbers.map((serial, idx) => `
                 <tr>
                   <td style="text-align: center; color: #64748b;">${idx + 1}</td>
-                  <td><span style="font-weight: 700; color: #7c3aed; font-family: monospace; font-size: 0.813rem;">${serial.serialNumber}</span></td>
-                  <td><span class="badge badge-version">${serial.version || 'N/A'}</span></td>
-                  <td style="color: #475569;">${serial.recordedBy}</td>
-                  <td style="color: #64748b; font-size: 0.75rem;">${new Date(serial.recordedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td style="text-align: left;"><span style="font-weight: 700; color: #7c3aed; font-family: monospace; font-size: 0.813rem;">${serial.serialNumber}</span></td>
+                  <td style="text-align: left;"><span class="badge badge-version">${serial.version || 'N/A'}</span></td>
+                  <td style="text-align: left; color: #475569;">${serial.recordedBy}</td>
+                  <td style="text-align: left; color: #64748b; font-size: 0.75rem;">${new Date(serial.recordedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1000,7 +1020,7 @@ export class PreSalesComponent implements OnInit {
               <div class="timeline-item ${idx === 0 ? 'current' : ''}">
                 <div class="timeline-header">
                   <div class="timeline-title">${stage.stage} ${idx === 0 ? '<span class="badge badge-current" style="margin-left: 8px;">CURRENT</span>' : ''}</div>
-                  <div class="timeline-date">${new Date(stage.changedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div class="timeline-date">${new Date(stage.changedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
                 <div class="timeline-meta">By ${stage.changedBy}</div>
                 ${stage.remarks ? '<div class="timeline-content">' + stage.remarks + '</div>' : ''}
@@ -1026,7 +1046,7 @@ export class PreSalesComponent implements OnInit {
                     Version ${scope.version}
                     ${idx === 0 ? '<span class="badge badge-current" style="margin-left: 8px;">CURRENT</span>' : '<span class="badge badge-version" style="margin-left: 8px;">v' + scope.version + '</span>'}
                   </div>
-                  <div class="timeline-date">${new Date(scope.modifiedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div class="timeline-date">${new Date(scope.modifiedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
                 <div class="timeline-meta">Modified by ${scope.modifiedBy}</div>
                 <div class="timeline-content">${scope.scope}</div>
@@ -1631,11 +1651,36 @@ export class PreSalesComponent implements OnInit {
   }
 
   editPreSales(data: PreSales, index: number): void {
+    // Fetch fresh data from API before opening edit modal
+    this.isLoading = true;
+    const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
+    
+    this.apiService.getPreSalesById(projectNoNumber).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        if (response.success && response.data) {
+          const freshData = this.mapApiResponseToPreSales(response.data);
+          this.openEditModal(freshData, index);
+        } else {
+          Swal.fire('Error', response.message || 'Failed to load project details', 'error');
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('Error loading project details:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to load project details', 'error');
+      }
+    });
+  }
+
+  openEditModal(data: PreSales, index: number): void {
     this.isEditMode = true;
     this.editingIndex = index;
     this.editingRecord = data;
     this.scopeHistoryExpanded = false;
     this.stageHistoryExpanded = false;
+    
+    console.log('Opening edit modal with fresh data, serialNumbers:', data.serialNumbers?.length);
     
     // Preserve existing attachment URLs (handle both array and comma-separated string)
     if (data.attachmentUrls) {
