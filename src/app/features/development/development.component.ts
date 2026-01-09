@@ -1,6 +1,6 @@
 import { Component, OnInit, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, GridReadyEvent, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import Swal from 'sweetalert2';
@@ -13,34 +13,32 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 @Component({
   selector: 'app-development',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, AgGridAngular],
+  imports: [CommonModule, FormsModule, AgGridAngular],
   templateUrl: './development.component.html',
   styleUrls: ['./development.component.scss']
 })
 export class DevelopmentComponent implements OnInit {
-  preSalesForm!: FormGroup;
-  advanceForm!: FormGroup;
-  serialForm!: FormGroup;
-  isModalOpen = false;
-  isAdvanceModalOpen = false;
-  isSerialModalOpen = false;
   isLoading = false;
-  isEditMode = false;
-  editingIndex: number = -1;
-  editingRecord: PreSales | null = null;
-  selectedProjectForAdvance: PreSales | null = null;
-  selectedProjectIndex: number = -1;
-  existingAdvancePayments: any[] = [];
-  selectedProjectForSerial: PreSales | null = null;
-  selectedProjectIndexForSerial: number = -1;
-  isDragging = false;
-  selectedFiles: File[] = [];
-  currentUserName = 'Admin User'; // This should come from auth service
+  currentUserName = 'Admin User';
   currentUserId: string = '';
-  uploadedAttachmentUrls: string[] = [];
-  scopeHistoryExpanded = false;
   projectStages = PROJECT_STAGES;
-  stageHistoryExpanded = false;
+
+  // Status Update Modal
+  isStatusModalOpen = false;
+  selectedProject: PreSales | null = null;
+  statusList: any[] = [];
+  existingStatusUpdates: any[] = [];
+  statusUpdate = {
+    notes: '',
+    statusCode: ''
+  };
+  sourceFile: File | null = null;
+  compiledFile: File | null = null;
+  isDraggingSource = false;
+  isDraggingCompiled = false;
+  showCompiledFileUpload = false;
+  uploadedSourceUrl: string = '';
+  uploadedCompiledUrl: string = '';
 
   // AG Grid Configuration
   columnDefs: ColDef[] = [
@@ -67,73 +65,6 @@ export class DevelopmentComponent implements OnInit {
       flex: 2,
       minWidth: 150
     },
-    { 
-      field: 'projectValue', 
-      headerName: 'Project Value', 
-      width: 140,
-      valueFormatter: (params: any) => {
-        if (params.value != null) {
-          return params.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
-        return '';
-      },
-      cellStyle: (params: any): any => {
-        if (params.node.rowPinned) {
-          return { 'font-weight': 'bold', 'background-color': '#f3f4f6', 'text-align': 'right' };
-        }
-        return { 'text-align': 'right' };
-      },
-      headerClass: 'ag-right-aligned-header'
-    },
-    { 
-      field: 'currentStage', 
-      headerName: 'Stage', 
-      width: 180,
-      cellRenderer: (params: any) => {
-        const stage = params.value;
-        const colors: { [key: string]: string } = {
-          'Pre-Sales': 'bg-blue-100 text-blue-800',
-          'Quotation': 'bg-yellow-100 text-yellow-800',
-          'Confirmed': 'bg-green-100 text-green-800',
-          'Development': 'bg-purple-100 text-purple-800',
-          'Completed': 'bg-gray-100 text-gray-800'
-        };
-        
-        // Check if confirmed stage but no serial numbers
-        const needsSerial = stage === 'Confirmed' && (!params.data.serialNumbers || params.data.serialNumbers.length === 0);
-        
-        // Debug log to check serial numbers
-        if (stage === 'Confirmed') {
-          console.log(`Project ${params.data.projectNo}: serialNumbers count = ${params.data.serialNumbers?.length || 0}`, params.data.serialNumbers);
-        }
-        
-        const container = document.createElement('span');
-        container.className = `px-2 py-1 text-xs font-medium rounded ${colors[stage] || 'bg-gray-100 text-gray-800'}`;
-        container.textContent = stage;
-        
-        if (needsSerial) {
-          const warningWrapper = document.createElement('span');
-          warningWrapper.className = 'text-red-600 ml-1 inline-flex items-center cursor-help';
-          warningWrapper.title = 'Serial number required for confirmed projects';
-          warningWrapper.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>';
-          warningWrapper.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.ngZone.run(() => {
-              Swal.fire({
-                icon: 'warning',
-                title: 'Serial Number Required',
-                text: 'This project is in Confirmed stage but has no serial numbers added. Please add at least one serial number using the Serial button.',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#6366f1'
-              });
-            });
-          });
-          container.appendChild(warningWrapper);
-        }
-        
-        return container;
-      }
-    },
     {
       headerName: 'Actions',
       width: 260,
@@ -152,20 +83,9 @@ export class DevelopmentComponent implements OnInit {
   };
 
   rowData: PreSales[] = [];
-  pinnedBottomRowData: any[] = [
-    {
-      projectNo: '',
-      partyName: '',
-      projectName: 'Total',
-      projectValue: 0,
-      currentStage: '',
-      actions: ''
-    }
-  ];
   gridApi: any;
 
   constructor(
-    private fb: FormBuilder, 
     private ngZone: NgZone,
     private apiService: ApiService,
     private authService: AuthService
@@ -188,59 +108,21 @@ export class DevelopmentComponent implements OnInit {
       this.ngZone.run(() => this.viewPreSales(params.data));
     });
     
-    const editBtn = document.createElement('button');
-    editBtn.className = 'p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors';
-    editBtn.title = 'Edit';
-    editBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>';
-    editBtn.addEventListener('click', () => {
-      this.ngZone.run(() => this.editPreSales(params.data, params.rowIndex));
+    const statusBtn = document.createElement('button');
+    statusBtn.className = 'p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors';
+    statusBtn.title = 'Add Status Update';
+    statusBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>';
+    statusBtn.addEventListener('click', () => {
+      this.ngZone.run(() => this.openStatusModal(params.data));
     });
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors';
-    deleteBtn.title = 'Delete';
-    deleteBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
-    deleteBtn.addEventListener('click', () => {
-      this.ngZone.run(() => this.deletePreSales(params.data));
-    });
-    
-    // Append buttons in order: Serial (conditional), Advance (conditional), View, Edit, Delete
-    
-    // Show Serial button if stage is Confirmed
-    if (params.data.currentStage === 'Confirmed') {
-      const serialBtn = document.createElement('button');
-      serialBtn.className = 'p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors';
-      serialBtn.title = 'Add Serial Number';
-      serialBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>';
-      serialBtn.addEventListener('click', () => {
-        this.ngZone.run(() => this.openSerialModal(params.data, params.rowIndex));
-      });
-      container.appendChild(serialBtn);
-    }
-    
-    // Show Advance button if stage is Quotation or Confirmed
-    if (params.data.currentStage === 'Quotation' || params.data.currentStage === 'Confirmed') {
-      const advanceBtn = document.createElement('button');
-      advanceBtn.className = 'p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors';
-      advanceBtn.title = 'Add Advance';
-      advanceBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-      advanceBtn.addEventListener('click', () => {
-        this.ngZone.run(() => this.openAdvanceModal(params.data, params.rowIndex));
-      });
-      container.appendChild(advanceBtn);
-    }
     
     container.appendChild(viewBtn);
-    container.appendChild(editBtn);
-    container.appendChild(deleteBtn);
+    container.appendChild(statusBtn);
     
     return container;
   }
 
   ngOnInit(): void {
-    this.initForm();
-    this.initAdvanceForm();
-    this.initSerialForm();
     this.loadUserInfo();
     this.loadPreSalesData();
   }
@@ -304,28 +186,13 @@ export class DevelopmentComponent implements OnInit {
           console.log('First row data:', this.rowData[0]);
           console.log('ProjectValue of first row:', this.rowData[0]?.projectValue);
           
-          // Update editingRecord if modal is open in edit mode
-          if (this.isEditMode && this.editingRecord && this.editingRecord.projectNo) {
-            const updatedRecord = this.rowData.find(item => item.projectNo === this.editingRecord?.projectNo);
-            if (updatedRecord) {
-              this.editingRecord = updatedRecord;
-              console.log('Updated editingRecord with fresh data, serialNumbers:', updatedRecord.serialNumbers?.length);
-            }
-          }
-          
           // Refresh grid cells to update cell renderers (like the stage badge with warning icon)
           if (this.gridApi) {
             this.gridApi.refreshCells({ force: true });
           }
-          
-          // Update total after a brief delay to ensure grid has processed the data
-          setTimeout(() => {
-            this.updateTotalRow();
-          }, 0);
         } else {
           console.warn('No data returned from API, using empty array');
           this.rowData = [];
-          this.updateTotalRow();
         }
       },
       error: (error) => {
@@ -333,7 +200,6 @@ export class DevelopmentComponent implements OnInit {
         console.error('Error loading confirmed projects data:', error);
         Swal.fire('Error', error.error?.message || 'Failed to load data from server', 'error');
         this.rowData = [];
-        this.updateTotalRow();
       }
     });
   }
@@ -596,325 +462,15 @@ export class DevelopmentComponent implements OnInit {
       }
     ];
     
-    this.updateTotalRow();
-  }
-  
-  updateTotalRow(): void {
-    let total = 0;
-
-    if (this.gridApi) {
-      // Prefer using displayed rows when available
-      const displayedCount = this.gridApi.getDisplayedRowCount ? this.gridApi.getDisplayedRowCount() : 0;
-      if (displayedCount > 0) {
-        this.gridApi.forEachNodeAfterFilter((node: any) => {
-          console.log('Node data:', node.data);
-          if (node.data && node.data.projectValue != null && !isNaN(Number(node.data.projectValue))) {
-            const value = Number(node.data.projectValue);
-            console.log('Adding projectValue:', value, 'Type:', typeof value);
-            total += value;
-          }
-        });
-        console.log('Total calculated from grid:', total, 'Displayed rows:', displayedCount);
-      } else {
-        // Grid exists but hasn't yet populated nodes; fallback to rowData
-        total = this.rowData.reduce((sum, project) => sum + (Number(project.projectValue) || 0), 0);
-        console.log('Grid had no displayed rows; total calculated from rowData:', total, 'Row count:', this.rowData.length);
-      }
-    } else {
-      // Fallback: calculate from all rows if grid API not available yet
-      total = this.rowData.reduce((sum, project) => sum + (Number(project.projectValue) || 0), 0);
-      console.log('Total calculated from rowData:', total, 'Row count:', this.rowData.length);
-    }
-
-    console.log('Setting pinnedBottomRowData with total:', total);
-    this.pinnedBottomRowData = [
-      {
-        projectNo: '',
-        partyName: '',
-        projectName: 'Total',
-        projectValue: total,
-        currentStage: '',
-        actions: ''
-      }
-    ];
-    
-    // Trigger change detection to update the grid
-    if (this.gridApi) {
-      this.gridApi.refreshCells({ force: true });
-    }
   }
 
-  initForm(): void {
-    this.preSalesForm = this.fb.group({
-      partyName: ['', [Validators.required, Validators.minLength(3)]],
-      projectName: ['', [Validators.required, Validators.minLength(3)]],
-      contactPerson: ['', [Validators.required, Validators.minLength(3)]],
-      mobileNumber: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
-      emailId: ['', [Validators.required, Validators.email]],
-      agentName: ['', [Validators.required, Validators.minLength(3)]],
-      projectValue: ['', [Validators.required, Validators.min(0)]],
-      scopeOfDevelopment: ['', [Validators.required, Validators.minLength(10)]],
-      currentStage: ['Pre-Sales', Validators.required],
-      attachments: [null]
-    });
-  }
 
-  initAdvanceForm(): void {
-    this.advanceForm = this.fb.group({
-      amount: ['', [Validators.required, Validators.min(1)]],
-      date: ['', Validators.required],
-      tallyEntryNumber: ['', [Validators.required, Validators.minLength(1)]]
-    });
-  }
 
-  initSerialForm(): void {
-    this.serialForm = this.fb.group({
-      serialNumber: ['', [Validators.required, Validators.minLength(1)]],
-      version: [''] // Optional field
-    });
-  }
 
-  openModal(): void {
-    this.isEditMode = false;
-    this.editingIndex = -1;
-    this.preSalesForm.reset();
-    this.selectedFiles = [];
-    this.uploadedAttachmentUrls = [];
-    this.isModalOpen = true;
-  }
 
-  closeModal(): void {
-    this.isModalOpen = false;
-    this.preSalesForm.reset();
-    this.selectedFiles = [];
-    this.uploadedAttachmentUrls = [];
-    this.isEditMode = false;
-    this.editingIndex = -1;
-    this.editingRecord = null;
-    this.scopeHistoryExpanded = false;
-  }
 
-  onSubmit(): void {
-    if (this.preSalesForm.invalid) {
-      Object.keys(this.preSalesForm.controls).forEach(key => {
-        this.preSalesForm.controls[key].markAsTouched();
-      });
-      Swal.fire('Validation Error', 'Please fill all required fields correctly', 'error');
-      return;
-    }
 
-    this.isLoading = true;
-    console.log('Submitting with uploaded URLs:', this.uploadedAttachmentUrls);
-    
-    // Files already uploaded, just submit the data
-    this.submitPreSalesData();
-  }
 
-  uploadFiles(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const uploadPromises = this.selectedFiles.map(file => 
-        this.apiService.uploadPreSalesAttachment(file).toPromise()
-      );
-      
-      Promise.all(uploadPromises)
-        .then((responses) => {
-          const newUrls = responses
-            .filter(res => res?.success && res?.data)
-            .map(res => res.data.fullUrlPath || res.data);
-          // Append new URLs to existing ones
-          this.uploadedAttachmentUrls = [...this.uploadedAttachmentUrls, ...newUrls];
-          resolve();
-        })
-        .catch((error) => {
-          console.error('Error uploading files:', error);
-          reject(error);
-        });
-    });
-  }
-
-  submitPreSalesData(): void {
-    const formValue = this.preSalesForm.value;
-    
-    console.log('Attachment URLs array:', this.uploadedAttachmentUrls);
-    
-    const preSalesData = {
-      partyName: formValue.partyName,
-      projectName: formValue.projectName,
-      contactPerson: formValue.contactPerson,
-      mobileNumber: formValue.mobileNumber,
-      emailId: formValue.emailId,
-      agentName: formValue.agentName,
-      projectValue: formValue.projectValue,
-      scopeOfDevelopment: formValue.scopeOfDevelopment,
-      currentStage: formValue.currentStage,
-      attachmentUrls: this.uploadedAttachmentUrls,
-      userId: this.currentUserId
-    };
-    
-    console.log('Submitting preSalesData:', preSalesData);
-    
-    if (this.isEditMode && this.editingRecord) {
-      // Update existing record
-      const existingRecord = this.editingRecord;
-      const stageChanged = existingRecord.currentStage !== formValue.currentStage;
-      
-      // Check if stage is being reverted
-      const currentStageIndex = PROJECT_STAGES.indexOf(existingRecord.currentStage);
-      const newStageIndex = PROJECT_STAGES.indexOf(formValue.currentStage);
-      
-      if (stageChanged && newStageIndex < currentStageIndex) {
-        this.isLoading = false;
-        Swal.fire('Invalid Stage Change', 'Cannot revert to a previous stage. Stages can only progress forward.', 'error');
-        return;
-      }
-      
-      // Call update API
-      const projectNoNumber = typeof existingRecord.projectNo === 'string' ? parseInt(existingRecord.projectNo, 10) : existingRecord.projectNo;
-      this.apiService.updatePreSales(projectNoNumber, preSalesData).subscribe({
-        next: (response) => {
-          this.isLoading = false;
-          if (response.success) {
-            Swal.fire('Success', response.message || 'Pre-sales record updated successfully', 'success');
-            this.closeModal();
-            this.loadPreSalesData();
-          } else {
-            Swal.fire('Error', response.message || 'Failed to update record', 'error');
-          }
-        },
-        error: (error) => {
-          this.isLoading = false;
-          console.error('Error updating pre-sales:', error);
-          Swal.fire('Error', error.error?.message || 'Failed to update record', 'error');
-        }
-      });
-    } else {
-      // Create new record
-      this.apiService.createPreSales(preSalesData).subscribe({
-        next: (response) => {
-          this.isLoading = false;
-          if (response.success) {
-            Swal.fire('Success', response.message || 'Pre-sales record created successfully', 'success');
-            this.closeModal();
-            this.loadPreSalesData();
-          } else {
-            Swal.fire('Error', response.message || 'Failed to create record', 'error');
-          }
-        },
-        error: (error) => {
-          this.isLoading = false;
-          console.error('Error creating pre-sales:', error);
-          Swal.fire('Error', error.error?.message || 'Failed to create record', 'error');
-        }
-      });
-    }
-  }
-
-  onSubmitOLD_REMOVED(): void {
-    // OLD HARDCODED LOGIC REMOVED
-    const formValue = this.preSalesForm.value;
-      
-    if (this.isEditMode && this.editingIndex >= 0) {
-      // Update existing record
-      const existingRecord = this.rowData[this.editingIndex];
-      const scopeChanged = existingRecord.scopeOfDevelopment !== formValue.scopeOfDevelopment;
-      const stageChanged = existingRecord.currentStage !== formValue.currentStage;
-      
-      // Check if stage is being reverted
-      const currentStageIndex = PROJECT_STAGES.indexOf(existingRecord.currentStage);
-      const newStageIndex = PROJECT_STAGES.indexOf(formValue.currentStage);
-      
-      if (stageChanged && newStageIndex < currentStageIndex) {
-        this.isLoading = false;
-        Swal.fire('Invalid Stage Change', 'Cannot revert to a previous stage. Stages can only progress forward.', 'error');
-        return;
-      }
-      
-      // Create new scope version if scope changed
-      let updatedScopeHistory = existingRecord.scopeHistory || [];
-      if (scopeChanged) {
-        const newVersion: ScopeVersion = {
-          version: (updatedScopeHistory.length || 0) + 1,
-          scope: formValue.scopeOfDevelopment,
-          modifiedBy: this.currentUserName,
-          modifiedDate: new Date()
-        };
-        updatedScopeHistory = [...updatedScopeHistory, newVersion];
-      }
-      
-      // Create stage history entry if stage changed
-      let updatedStageHistory = existingRecord.stageHistory || [];
-      if (stageChanged) {
-        const newStageEntry: StageHistory = {
-          stage: formValue.currentStage,
-          changedBy: this.currentUserName,
-          changedDate: new Date()
-          };
-          updatedStageHistory = [...updatedStageHistory, newStageEntry];
-        }
-        
-        this.rowData[this.editingIndex] = {
-          projectNo: existingRecord.projectNo,
-          ...formValue,
-          projectValue: parseFloat(formValue.projectValue),
-          scopeHistory: updatedScopeHistory,
-          stageHistory: updatedStageHistory,
-          attachmentUrls: []
-        };
-        
-        let message = 'Pre-sales record updated successfully';
-        if (scopeChanged) message += ' (New scope version created)';
-        if (stageChanged) message += ` (Stage updated to ${formValue.currentStage})`;
-        
-        Swal.fire('Success', message, 'success');
-      } else {
-        // Add new record - Generate project number in YYYY-MMM-XXXX format
-        const now = new Date();
-        const year = now.getFullYear();
-        const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-        const month = monthNames[now.getMonth()];
-        
-        // Extract sequence numbers from existing project numbers for current month
-        const currentMonthPrefix = `${year}-${month}-`;
-        const existingSequences = this.rowData
-          .filter(r => r.projectNo.startsWith(currentMonthPrefix))
-          .map(r => parseInt(r.projectNo.split('-')[2]))
-          .filter(n => !isNaN(n));
-        
-        const nextSequence = existingSequences.length > 0 ? Math.max(...existingSequences) + 1 : 1;
-        const newProjectNo = `${year}-${month}-${nextSequence.toString().padStart(4, '0')}`;
-        
-        const initialScopeVersion: ScopeVersion = {
-          version: 1,
-          scope: formValue.scopeOfDevelopment,
-          modifiedBy: this.currentUserName,
-          modifiedDate: new Date()
-        };
-        
-        const initialStageEntry: StageHistory = {
-          stage: formValue.currentStage,
-          changedBy: this.currentUserName,
-          changedDate: new Date()
-        };
-        
-        const newRecord: PreSales = {
-          projectNo: newProjectNo,
-          ...formValue,
-          projectValue: parseFloat(formValue.projectValue),
-          scopeHistory: [initialScopeVersion],
-          stageHistory: [initialStageEntry],
-          attachmentUrls: []
-        };
-        
-        this.rowData = [newRecord, ...this.rowData];
-        
-        Swal.fire('Success', 'Pre-sales record added successfully', 'success');
-      }
-      
-      this.updateTotalRow();
-      this.isLoading = false;
-      this.closeModal();
-    // OLD setTimeout REMOVED
-  }
 
   viewPreSales(data: PreSales): void {
     // Fetch fresh data from API
@@ -1573,17 +1129,9 @@ export class DevelopmentComponent implements OnInit {
                 <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span>Basic Info</span>
               </div>
-              <div class="nav-item" data-tab="stage">
-                <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                <span>Stage History</span>
-              </div>
               <div class="nav-item" data-tab="scope">
                 <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <span>Scope</span>
-              </div>
-              <div class="nav-item" data-tab="advance">
-                <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                <span>Advance Payments</span>
               </div>
               <div class="nav-item" data-tab="serial">
                 <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>
@@ -1624,16 +1172,8 @@ export class DevelopmentComponent implements OnInit {
               </div>
             </div>
             
-            <div id="stage" class="tab-panel">
-              ${stageSection}
-            </div>
-            
             <div id="scope" class="tab-panel">
               ${scopeSection}
-            </div>
-            
-            <div id="advance" class="tab-panel">
-              ${advanceSection}
             </div>
             
             <div id="serial" class="tab-panel">
@@ -1676,464 +1216,252 @@ export class DevelopmentComponent implements OnInit {
     });
   }
 
-  editPreSales(data: PreSales, index: number): void {
-    // Fetch fresh data from API before opening edit modal
-    this.isLoading = true;
-    const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
-    
-    this.apiService.getPreSalesById(projectNoNumber).subscribe({
+  // Status Update Methods
+  openStatusModal(project: PreSales): void {
+    this.selectedProject = project;
+    this.isStatusModalOpen = true;
+    this.loadStatuses();
+    this.loadExistingStatusUpdates();
+    this.resetStatusForm();
+  }
+
+  closeStatusModal(): void {
+    this.isStatusModalOpen = false;
+    this.selectedProject = null;
+    this.resetStatusForm();
+  }
+
+  resetStatusForm(): void {
+    this.statusUpdate = {
+      notes: '',
+      statusCode: ''
+    };
+    this.sourceFile = null;
+    this.compiledFile = null;
+    this.uploadedSourceUrl = '';
+    this.uploadedCompiledUrl = '';
+    this.showCompiledFileUpload = false;
+    this.isDraggingSource = false;
+    this.isDraggingCompiled = false;
+    this.existingStatusUpdates = [];
+  }
+
+  loadStatuses(): void {
+    this.apiService.getStatuses().subscribe({
       next: (response) => {
-        this.isLoading = false;
-        if (response.success && response.data) {
-          const freshData = this.mapApiResponseToPreSales(response.data);
-          this.openEditModal(freshData, index);
-        } else {
-          Swal.fire('Error', response.message || 'Failed to load project details', 'error');
+        if (response.success) {
+          this.statusList = response.data;
         }
       },
       error: (error) => {
-        this.isLoading = false;
-        console.error('Error loading project details:', error);
-        Swal.fire('Error', error.error?.message || 'Failed to load project details', 'error');
+        console.error('Error loading statuses:', error);
+        Swal.fire('Error', 'Failed to load status list', 'error');
       }
     });
   }
 
-  openEditModal(data: PreSales, index: number): void {
-    this.isEditMode = true;
-    this.editingIndex = index;
-    this.editingRecord = data;
-    this.scopeHistoryExpanded = false;
-    this.stageHistoryExpanded = false;
-    
-    console.log('Opening edit modal with fresh data, serialNumbers:', data.serialNumbers?.length);
-    
-    // Preserve existing attachment URLs (handle both array and comma-separated string)
-    if (data.attachmentUrls) {
-      if (Array.isArray(data.attachmentUrls)) {
-        this.uploadedAttachmentUrls = [...data.attachmentUrls];
-      } else {
-        const urlString = data.attachmentUrls as any as string;
-        if (urlString && urlString.length > 0) {
-          this.uploadedAttachmentUrls = urlString.split(',').map((url: string) => url.trim());
-        } else {
-          this.uploadedAttachmentUrls = [];
+  loadExistingStatusUpdates(): void {
+    if (!this.selectedProject) return;
+
+    const projectNoNumber = typeof this.selectedProject.projectNo === 'string'
+      ? parseInt(this.selectedProject.projectNo, 10)
+      : this.selectedProject.projectNo;
+
+    this.apiService.getStatusUpdatesByProject(projectNoNumber).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.existingStatusUpdates = response.data || [];
         }
+      },
+      error: (error) => {
+        console.error('Error loading status updates:', error);
+        this.existingStatusUpdates = [];
       }
-    } else {
-      this.uploadedAttachmentUrls = [];
+    });
+  }
+
+  onStatusChange(): void {
+    const selectedStatus = this.statusList.find(s => s.statusCode === this.statusUpdate.statusCode);
+    if (selectedStatus) {
+      // Show compiled file upload only for Completed status (CP)
+      this.showCompiledFileUpload = selectedStatus.statusCode === 'CP';
+      
+      // Clear compiled file if status changed to one that doesn't require it
+      if (!this.showCompiledFileUpload) {
+        this.compiledFile = null;
+        this.uploadedCompiledUrl = '';
+      }
     }
-    console.log('Edit mode - existing URLs:', this.uploadedAttachmentUrls);
-    this.selectedFiles = [];
-    
-    this.preSalesForm.patchValue({
-      partyName: data.partyName,
-      projectName: data.projectName,
-      contactPerson: data.contactPerson,
-      mobileNumber: data.mobileNumber,
-      emailId: data.emailId,
-      agentName: data.agentName,
-      projectValue: data.projectValue,
-      scopeOfDevelopment: data.scopeOfDevelopment,
-      currentStage: data.currentStage
-    });
-    
-    this.isModalOpen = true;
   }
 
-  deletePreSales(data: PreSales): void {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: 'Do you want to delete this pre-sales record?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.isLoading = true;
-        const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
-        
-        this.apiService.deletePreSales(projectNoNumber, this.currentUserId).subscribe({
-          next: (response) => {
-            this.isLoading = false;
-            if (response.success) {
-              Swal.fire('Success', response.message || 'Pre-sales record deleted successfully', 'success');
-              this.loadPreSalesData();
-            } else {
-              Swal.fire('Error', response.message || 'Failed to delete record', 'error');
-            }
-          },
-          error: (error) => {
-            this.isLoading = false;
-            console.error('Error deleting pre-sales:', error);
-            Swal.fire('Error', error.error?.message || 'Failed to delete record', 'error');
-          }
-        });
-      }
-    });
-  }
-
-  onFileChange(event: any): void {
+  onFileChange(event: any, type: 'source' | 'compiled'): void {
     const files = event.target.files;
     if (files && files.length > 0) {
-      console.log('Files selected:', files.length);
-      const newFiles = Array.from(files) as File[];
-      this.selectedFiles = [...this.selectedFiles, ...newFiles];
-      console.log('Total files now:', this.selectedFiles.length);
+      const file = files[0];
       
-      // Upload immediately
-      this.uploadFilesImmediately(newFiles);
+      if (type === 'source') {
+        if (!file.name.endsWith('.zip')) {
+          Swal.fire('Invalid File', 'Please select a .zip file for source code', 'error');
+          return;
+        }
+        this.sourceFile = file;
+        this.uploadFileImmediately(file, 'source');
+      } else {
+        if (!file.name.endsWith('.tcp')) {
+          Swal.fire('Invalid File', 'Please select a .tcp file for compiled file', 'error');
+          return;
+        }
+        this.compiledFile = file;
+        this.uploadFileImmediately(file, 'compiled');
+      }
     }
-    // Reset input to allow selecting same file again
     event.target.value = '';
   }
 
-  onDragOver(event: DragEvent): void {
+  onDragOver(event: DragEvent, type: 'source' | 'compiled'): void {
     event.preventDefault();
     event.stopPropagation();
-    this.isDragging = true;
+    if (type === 'source') {
+      this.isDraggingSource = true;
+    } else {
+      this.isDraggingCompiled = true;
+    }
   }
 
-  onDragLeave(event: DragEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-    this.isDragging = false;
+  onDragLeave(type: 'source' | 'compiled'): void {
+    if (type === 'source') {
+      this.isDraggingSource = false;
+    } else {
+      this.isDraggingCompiled = false;
+    }
   }
 
-  onDrop(event: DragEvent): void {
+  onDrop(event: DragEvent, type: 'source' | 'compiled'): void {
     event.preventDefault();
     event.stopPropagation();
-    this.isDragging = false;
+    
+    if (type === 'source') {
+      this.isDraggingSource = false;
+    } else {
+      this.isDraggingCompiled = false;
+    }
 
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
-      console.log('Files dropped:', files.length);
-      const newFiles = Array.from(files) as File[];
-      this.selectedFiles = [...this.selectedFiles, ...newFiles];
-      console.log('Total files now:', this.selectedFiles.length);
+      const file = files[0];
       
-      // Upload immediately
-      this.uploadFilesImmediately(newFiles);
-    }
-  }
-
-  uploadFilesImmediately(files: File[]): void {
-    console.log('Uploading files immediately:', files.length);
-    const uploadPromises = files.map(file => {
-      console.log('Uploading file:', file.name);
-      return this.apiService.uploadPreSalesAttachment(file).toPromise();
-    });
-    
-    Promise.all(uploadPromises)
-      .then((responses) => {
-        console.log('Upload responses:', responses);
-        const newUrls = responses
-          .filter(res => res && (res.fullUrlPath || res.data?.fullUrlPath))
-          .map(res => {
-            // Handle direct response or nested in data
-            const url = res.fullUrlPath || res.data?.fullUrlPath || res.data;
-            console.log('Extracted URL:', url);
-            return url;
-          });
-        
-        this.uploadedAttachmentUrls = [...this.uploadedAttachmentUrls, ...newUrls];
-        console.log('Total uploaded URLs:', this.uploadedAttachmentUrls.length, this.uploadedAttachmentUrls);
-      })
-      .catch((error) => {
-        console.error('Error uploading files:', error);
-        Swal.fire('Upload Error', 'Failed to upload some files', 'error');
-      });
-  }
-
-  removeFile(index: number): void {
-    console.log('Removing file at index:', index);
-    this.selectedFiles.splice(index, 1);
-    this.uploadedAttachmentUrls.splice(index, 1);
-    console.log('Files remaining:', this.selectedFiles.length, 'URLs remaining:', this.uploadedAttachmentUrls.length);
-  }
-
-  viewScopeHistory(data: PreSales): void {
-    const scopeHistory = data.scopeHistory || [];
-    
-    if (scopeHistory.length === 0) {
-      Swal.fire('No History', 'No scope history available for this project.', 'info');
-      return;
-    }
-    
-    const historyHtml = scopeHistory
-      .slice()
-      .reverse()
-      .map(version => `
-        <div class="mb-4 border-l-4 ${version.version === scopeHistory.length ? 'border-green-500' : 'border-gray-300'} pl-3 py-2 bg-gray-50 rounded">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-sm font-bold ${version.version === scopeHistory.length ? 'text-green-600' : 'text-gray-700'}">
-              Version ${version.version} ${version.version === scopeHistory.length ? '(Current)' : ''}
-            </span>
-            <span class="text-xs text-gray-500">
-              ${new Date(version.modifiedDate).toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </span>
-          </div>
-          <p class="text-xs text-gray-600 mb-1">Modified by: <strong>${version.modifiedBy}</strong></p>
-          <p class="text-sm text-gray-700 leading-relaxed bg-white p-2 rounded border border-gray-200">${version.scope}</p>
-        </div>
-      `)
-      .join('');
-    
-    Swal.fire({
-      title: '<div class="text-left"><strong class="text-xl text-gray-800">Scope History - ' + data.projectName + '</strong></div>',
-      html: '<div class="text-left max-h-96 overflow-y-auto"><p class="text-sm text-gray-600 mb-4">Total versions: ' + scopeHistory.length + '</p>' + historyHtml + '</div>',
-      width: 800,
-      showCloseButton: true,
-      showConfirmButton: false,
-      customClass: {
-        popup: 'rounded-xl shadow-2xl',
-        title: 'border-b pb-3',
-        htmlContainer: 'pt-4'
+      if (type === 'source') {
+        if (!file.name.endsWith('.zip')) {
+          Swal.fire('Invalid File', 'Please select a .zip file for source code', 'error');
+          return;
+        }
+        this.sourceFile = file;
+        this.uploadFileImmediately(file, 'source');
+      } else {
+        if (!file.name.endsWith('.tcp')) {
+          Swal.fire('Invalid File', 'Please select a .tcp file for compiled file', 'error');
+          return;
+        }
+        this.compiledFile = file;
+        this.uploadFileImmediately(file, 'compiled');
       }
-    });
-  }
-
-  viewCurrentScopeHistory(): void {
-    if (this.editingIndex >= 0) {
-      this.viewScopeHistory(this.rowData[this.editingIndex]);
     }
   }
 
-  toggleScopeHistoryExpanded(): void {
-    this.scopeHistoryExpanded = !this.scopeHistoryExpanded;
-  }
-
-  getReversedScopeHistory(): ScopeVersion[] {
-    if (!this.editingRecord?.scopeHistory) return [];
-    return [...this.editingRecord.scopeHistory].reverse();
-  }
-
-  formatDate(date: Date): string {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  toggleStageHistoryExpanded(): void {
-    this.stageHistoryExpanded = !this.stageHistoryExpanded;
-  }
-
-  getReversedStageHistory(): StageHistory[] {
-    if (!this.editingRecord?.stageHistory) return [];
-    return [...this.editingRecord.stageHistory].reverse();
-  }
-
-  needsSerialNumber(data: PreSales): boolean {
-    return data.currentStage === 'Confirmed' && (!data.serialNumbers || data.serialNumbers.length === 0);
-  }
-
-  getAvailableStages(): ProjectStage[] {
-    if (!this.isEditMode || !this.editingRecord) {
-      return PROJECT_STAGES;
-    }
-    
-    const currentStageIndex = PROJECT_STAGES.indexOf(this.editingRecord.currentStage);
-    // Only show current stage and forward stages
-    return PROJECT_STAGES.slice(currentStageIndex);
-  }
-
-  openAdvanceModal(data: PreSales, index: number): void {
-    this.selectedProjectForAdvance = data;
-    this.selectedProjectIndex = index;
-    this.advanceForm.reset();
-    this.existingAdvancePayments = [];
-    this.isAdvanceModalOpen = true;
-    
-    // Fetch existing advance payments from API
-    const projectNoNumber = typeof data.projectNo === 'string' ? parseInt(data.projectNo, 10) : data.projectNo;
-    this.apiService.getAdvancePayments(projectNoNumber).subscribe({
+  uploadFileImmediately(file: File, type: 'source' | 'compiled'): void {
+    console.log(`[File Upload] Starting upload for ${type} file:`, file.name);
+    this.apiService.uploadPreSalesAttachment(file).subscribe({
       next: (response) => {
-        if (response.success && response.data) {
-          this.existingAdvancePayments = response.data.map((payment: any) => ({
-            amount: payment.amount,
-            date: payment.date,
-            tallyEntryNumber: payment.tallyEntryNumber,
-            receivedBy: payment.receivedByName || payment.receivedBy || 'Unknown',
-            receivedDate: payment.receivedDate
-          }));
+        console.log(`[File Upload] Response for ${type}:`, response);
+        if (response) {
+          // API returns {fullUrlPath, filename, contentType} directly
+          const url = response.fullUrlPath || response.data?.fullUrlPath || response.data;
+          console.log(`[File Upload] Extracted URL for ${type}:`, url);
+          if (type === 'source') {
+            this.uploadedSourceUrl = url;
+            console.log('[File Upload] Source URL saved:', this.uploadedSourceUrl);
+          } else {
+            this.uploadedCompiledUrl = url;
+            console.log('[File Upload] Compiled URL saved:', this.uploadedCompiledUrl);
+          }
         }
       },
       error: (error) => {
-        console.error('Error loading advance payments:', error);
-      }
-    });
-  }
-
-  closeAdvanceModal(): void {
-    this.isAdvanceModalOpen = false;
-    this.selectedProjectForAdvance = null;
-    this.selectedProjectIndex = -1;
-    this.existingAdvancePayments = [];
-    this.advanceForm.reset();
-  }
-
-  onAdvanceSubmit(): void {
-    if (this.advanceForm.invalid) {
-      Object.keys(this.advanceForm.controls).forEach(key => {
-        this.advanceForm.controls[key].markAsTouched();
-      });
-      Swal.fire('Validation Error', 'Please fill all required fields correctly', 'error');
-      return;
-    }
-
-    if (!this.selectedProjectForAdvance) {
-      Swal.fire('Error', 'No project selected', 'error');
-      return;
-    }
-
-    this.isLoading = true;
-    const formValue = this.advanceForm.value;
-    
-    const paymentData = {
-      amount: parseFloat(formValue.amount),
-      paymentDate: formValue.date,
-      tallyEntryNumber: formValue.tallyEntryNumber,
-      userId: this.currentUserId
-    };
-
-    const projectNoNumber = typeof this.selectedProjectForAdvance.projectNo === 'string' 
-      ? parseInt(this.selectedProjectForAdvance.projectNo, 10) 
-      : this.selectedProjectForAdvance.projectNo;
-
-    this.apiService.addAdvancePayment(projectNoNumber, paymentData).subscribe({
-      next: (response) => {
-        this.isLoading = false;
-        if (response.success) {
-          // Reset form for next payment
-          this.advanceForm.reset();
-          
-          // Reload the advance payments list
-          this.apiService.getAdvancePayments(projectNoNumber).subscribe({
-            next: (paymentsResponse) => {
-              if (paymentsResponse.success && paymentsResponse.data) {
-                this.existingAdvancePayments = paymentsResponse.data.map((payment: any) => ({
-                  amount: payment.amount,
-                  date: payment.date,
-                  tallyEntryNumber: payment.tallyEntryNumber,
-                  receivedBy: payment.receivedByName || payment.receivedBy || 'Unknown',
-                  receivedDate: payment.receivedDate
-                }));
-              }
-            }
-          });
-          
-          Swal.fire({
-            title: 'Success',
-            html: `Payment of ₹${formValue.amount.toFixed(2)} added successfully!`,
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-          });
-          
-          this.loadPreSalesData();
+        console.error(`[File Upload] Error uploading ${type} file:`, error);
+        Swal.fire('Upload Error', `Failed to upload ${type} file`, 'error');
+        if (type === 'source') {
+          this.sourceFile = null;
         } else {
-          Swal.fire('Error', response.message || 'Failed to add advance payment', 'error');
+          this.compiledFile = null;
         }
-      },
-      error: (error) => {
-        this.isLoading = false;
-        console.error('Error adding advance payment:', error);
-        Swal.fire('Error', error.error?.message || 'Failed to add advance payment', 'error');
       }
     });
   }
 
-  getTotalAdvance(data: PreSales): number {
-    if (!data.advancePayments || data.advancePayments.length === 0) return 0;
-    return data.advancePayments.reduce((sum, adv) => sum + adv.amount, 0);
+  removeFile(type: 'source' | 'compiled'): void {
+    if (type === 'source') {
+      this.sourceFile = null;
+      this.uploadedSourceUrl = '';
+    } else {
+      this.compiledFile = null;
+      this.uploadedCompiledUrl = '';
+    }
   }
 
-  getTotalAdvanceFromList(payments: any[]): number {
-    if (!payments || payments.length === 0) return 0;
-    return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-  }
-
-  formatCurrency(amount: number): string {
-    return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  }
-
-  openSerialModal(data: PreSales, index: number): void {
-    this.selectedProjectForSerial = data;
-    this.selectedProjectIndexForSerial = index;
-    this.serialForm.reset();
-    this.isSerialModalOpen = true;
-  }
-
-  closeSerialModal(): void {
-    this.isSerialModalOpen = false;
-    this.selectedProjectForSerial = null;
-    this.selectedProjectIndexForSerial = -1;
-    this.serialForm.reset();
-  }
-
-  onSerialSubmit(): void {
-    if (this.serialForm.get('serialNumber')?.invalid) {
-      this.serialForm.get('serialNumber')?.markAsTouched();
-      Swal.fire('Validation Error', 'Please enter a serial number', 'error');
+  submitStatusUpdate(): void {
+    if (!this.statusUpdate.notes || !this.statusUpdate.statusCode) {
+      Swal.fire('Validation Error', 'Please fill in all required fields', 'error');
       return;
     }
 
-    if (this.selectedProjectIndexForSerial < 0 || !this.selectedProjectForSerial) {
-      Swal.fire('Error', 'No project selected', 'error');
+    if (!this.selectedProject) {
       return;
     }
 
     this.isLoading = true;
 
-    const formValue = this.serialForm.value;
-    const projectNo = Number(this.selectedProjectForSerial.projectNo);
-    
-    // Prepare data for API call
-    const serialData = {
-      serialNumber: formValue.serialNumber,
-      version: formValue.version || '',
-      recordedById: this.currentUserId || this.currentUserName,
-      recordedDate: new Date().toISOString()
+    const attachments = [];
+    if (this.uploadedSourceUrl) {
+      console.log('[Submit] Adding source URL to attachments:', this.uploadedSourceUrl);
+      attachments.push(this.uploadedSourceUrl);
+    }
+    if (this.uploadedCompiledUrl) {
+      console.log('[Submit] Adding compiled URL to attachments:', this.uploadedCompiledUrl);
+      attachments.push(this.uploadedCompiledUrl);
+    }
+
+    console.log('[Submit] Total attachments:', attachments);
+
+    const projectNoNumber = typeof this.selectedProject.projectNo === 'string' 
+      ? parseInt(this.selectedProject.projectNo, 10) 
+      : this.selectedProject.projectNo;
+
+    const payload = {
+      notes: this.statusUpdate.notes,
+      status: this.statusUpdate.statusCode,
+      attachmentUrls: attachments,
+      createdBy: this.currentUserId
     };
 
-    // Call API to add serial number
-    this.apiService.addSerialNumber(projectNo, serialData).subscribe({
+    console.log('[Submit] Final payload:', payload);
+    console.log('[Submit] Project number:', projectNoNumber);
+
+    this.apiService.createStatusUpdate(projectNoNumber, payload).subscribe({
       next: (response) => {
         this.isLoading = false;
-        
         if (response.success) {
-          // Close and reset the modal first
-          this.closeSerialModal();
-          
-          // Show success message using API response
-          Swal.fire({
-            title: 'Success',
-            text: response.message || 'Serial number added successfully',
-            icon: 'success'
-          });
-          
-          // Reload data from API to get updated serial numbers
-          this.loadPreSalesData();
+          Swal.fire('Success', 'Status update added successfully', 'success');
+          this.resetStatusForm();
+          this.loadExistingStatusUpdates(); // Refresh the status updates table
+          this.loadPreSalesData(); // Refresh the grid
         } else {
-          Swal.fire('Error', response.message || 'Failed to add serial number', 'error');
+          Swal.fire('Error', response.message || 'Failed to add status update', 'error');
         }
       },
       error: (error) => {
         this.isLoading = false;
-        console.error('Error adding serial number:', error);
-        Swal.fire('Error', error.error?.message || 'Failed to add serial number', 'error');
+        console.error('Error adding status update:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to add status update', 'error');
       }
     });
   }
@@ -2141,11 +1469,9 @@ export class DevelopmentComponent implements OnInit {
   onGridReady(params: GridReadyEvent): void {
     this.gridApi = params.api;
     params.api.sizeColumnsToFit();
-    // Recalculate total after grid is ready
-    this.updateTotalRow();
   }
 
   onFilterChanged(): void {
-    this.updateTotalRow();
+    // Filter changed - grid handles display automatically
   }
 }

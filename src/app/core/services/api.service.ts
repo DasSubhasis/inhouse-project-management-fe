@@ -702,6 +702,36 @@ export class ApiService {
     console.log('To change base URL, modify it directly in the service');
   }
 
+  // ============ STATUS UPDATE ENDPOINTS ============
+
+  /**
+   * Get all statuses for dropdown
+   */
+  getStatuses(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/Devlopment/status-master`);
+  }
+
+  /**
+   * Create a new status update for a project
+   */
+  createStatusUpdate(projectNo: number, statusData: {
+    notes: string;
+    status: string;
+    attachmentUrls: string[];
+    createdBy: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/Devlopment/${projectNo}/status`, statusData);
+  }
+
+  /**
+   * Get all status updates for a project
+   */
+  getStatusUpdatesByProject(projectNo: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/Devlopment/work-status/${projectNo}`);
+  }
+
+  // ============ GENERIC HTTP METHODS ============
+
   /**
    * Generic GET request
    */
