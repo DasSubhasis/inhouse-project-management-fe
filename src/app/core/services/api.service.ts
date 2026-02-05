@@ -597,15 +597,29 @@ export class ApiService {
   /**
    * Get all pre-sales projects
    */
-  getAllPreSales(): Observable<any> {
-    return this.http.get<any>(`${this.baseUrl}/PreSales/getall`);
+  getAllPreSales(userId?: string): Observable<any> {
+    const endpoint = userId 
+      ? `${this.baseUrl}/PreSales/getall?userId=${userId}`
+      : `${this.baseUrl}/PreSales/getall`;
+    return this.http.get<any>(endpoint);
   }
-
   /**
    * Get all confirmed projects (for development)
    */
-  getAllConfirmedProjects(): Observable<any> {
-    return this.http.get<any>(`${this.baseUrl}/Devlopment/getall-confirmed`);
+  getAllConfirmedProjects(userId?: string): Observable<any> {
+    const endpoint = userId 
+      ? `${this.baseUrl}/Devlopment/getall-confirmed/${userId}`
+      : `${this.baseUrl}/Devlopment/getall-confirmed`;
+    return this.http.get<any>(endpoint);
+  }
+
+  /**
+   * Assign user to a project
+   */
+  assignUserToProject(projectNo: string, assignedBy: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/Devlopment/${projectNo}/project-log`, {
+      assignedBy
+    });
   }
 
   /**

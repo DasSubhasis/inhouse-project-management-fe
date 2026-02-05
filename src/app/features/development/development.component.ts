@@ -7,6 +7,7 @@ import Swal from 'sweetalert2';
 import { PreSales, ScopeVersion, StageHistory, ProjectStage, PROJECT_STAGES, AdvancePayment, SerialNumber } from '../../core/models/pre-sales.model';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { User, UserRole } from '../../core/models/user.model';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -22,6 +23,15 @@ export class DevelopmentComponent implements OnInit {
   currentUserName = 'Admin User';
   currentUserId: string = '';
   projectStages = PROJECT_STAGES;
+
+  // User Assignment Modal
+  isUserAssignmentModalOpen = false;
+  selectedProjectForAssignment: PreSales | null = null;
+  allUsers: User[] = [];
+  developmentUsers: User[] = [];
+  filteredDevelopmentUsers: User[] = [];
+  selectedUserId: string = '';
+  userSearchTerm: string = '';
 
   // Status Update Modal
   isStatusModalOpen = false;
@@ -66,13 +76,26 @@ export class DevelopmentComponent implements OnInit {
       minWidth: 150
     },
     {
+      field: 'assignedTo',
+      headerName: 'Assigned To',
+      width: 150,
+      cellRenderer: (params: any) => {
+        if (params.node.rowPinned) return '';
+        const assignedTo = params.data.assignedTo;
+        if (assignedTo && assignedTo.trim() !== '') {
+          return `<span style="color: #059669; font-weight: 600;">${assignedTo}</span>`;
+        }
+        return `<span style="color: #9ca3af; font-style: italic;">Unassigned</span>`;
+      }
+    },
+    {
       headerName: 'Actions',
-      width: 260,
+      width: 180,
       cellRenderer: this.actionsCellRenderer.bind(this),
       pinned: 'right',
       sortable: false,
       filter: false,
-      cellStyle: { textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }
+      cellStyle: { textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }
     }
   ];
 
@@ -93,7 +116,7 @@ export class DevelopmentComponent implements OnInit {
 
   actionsCellRenderer(params: any): HTMLElement {
     const container = document.createElement('div');
-    container.className = 'flex gap-2 h-full items-center justify-center';
+    container.className = 'flex gap-2 h-full items-center justify-end';
     
     // Don't render buttons for pinned rows (total row)
     if (params.node.rowPinned) {
@@ -102,7 +125,7 @@ export class DevelopmentComponent implements OnInit {
     
     const viewBtn = document.createElement('button');
     viewBtn.className = 'p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors';
-    viewBtn.title = 'View';
+    viewBtn.title = 'View Details';
     viewBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
     viewBtn.addEventListener('click', () => {
       this.ngZone.run(() => this.viewPreSales(params.data));
@@ -116,14 +139,24 @@ export class DevelopmentComponent implements OnInit {
       this.ngZone.run(() => this.openStatusModal(params.data));
     });
     
+    const assignBtn = document.createElement('button');
+    assignBtn.className = 'p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors';
+    assignBtn.title = 'Assign User';
+    assignBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>';
+    assignBtn.addEventListener('click', () => {
+      this.ngZone.run(() => this.openUserAssignmentModal(params.data));
+    });
+    
     container.appendChild(viewBtn);
     container.appendChild(statusBtn);
+    container.appendChild(assignBtn);
     
     return container;
   }
 
   ngOnInit(): void {
     this.loadUserInfo();
+    this.loadUsers();
     this.loadPreSalesData();
   }
 
@@ -132,6 +165,61 @@ export class DevelopmentComponent implements OnInit {
     if (user) {
       this.currentUserName = user.name || 'Admin User';
       this.currentUserId = user.id?.toString() || '';
+    }
+  }
+
+  loadUsers(): void {
+    this.apiService.getAllUserMaster().subscribe({
+      next: (response: any) => {
+        console.log('Users API response:', response);
+        // Handle both response formats: direct array or wrapped in success/data
+        if (Array.isArray(response)) {
+          this.allUsers = response;
+        } else if (response.success && response.data) {
+          this.allUsers = response.data;
+        } else if (response.data) {
+          this.allUsers = response.data;
+        }
+        
+        console.log('All users loaded:', this.allUsers);
+        // Filter for development team roles
+        this.filterDevelopmentUsers();
+      },
+      error: (error) => {
+        console.error('Error loading users:', error);
+      }
+    });
+  }
+
+  filterDevelopmentUsers(): void {
+    // Filter users with "Development Team" role exactly
+    this.developmentUsers = this.allUsers.filter(user => {
+      const roleName = user.roleName?.trim() || '';
+      return roleName === 'Development Team';
+    });
+    
+    console.log('Development Team users:', this.developmentUsers);
+    
+    // If no development team users found, show all users as fallback
+    if (this.developmentUsers.length === 0) {
+      console.warn('No Development Team users found, showing all users');
+      this.developmentUsers = this.allUsers;
+    }
+    
+    this.filteredDevelopmentUsers = [...this.developmentUsers];
+    console.log('Filtered development users:', this.filteredDevelopmentUsers);
+  }
+
+  filterUsers(): void {
+    const searchTerm = this.userSearchTerm.toLowerCase().trim();
+    if (!searchTerm) {
+      this.filteredDevelopmentUsers = [...this.developmentUsers];
+    } else {
+      this.filteredDevelopmentUsers = this.developmentUsers.filter(user =>
+        user.userName?.toLowerCase().includes(searchTerm) ||
+        user.roleName?.toLowerCase().includes(searchTerm) ||
+        user.emailId?.toLowerCase().includes(searchTerm)
+      );
     }
   }
 
@@ -176,7 +264,8 @@ export class DevelopmentComponent implements OnInit {
 
   loadPreSalesData(): void {
     this.isLoading = true;
-    this.apiService.getAllConfirmedProjects().subscribe({
+    // Pass the current user's ID to filter projects
+    this.apiService.getAllConfirmedProjects(this.currentUserId).subscribe({
       next: (response) => {
         this.isLoading = false;
         if (response.success && response.data) {
@@ -200,6 +289,59 @@ export class DevelopmentComponent implements OnInit {
         console.error('Error loading confirmed projects data:', error);
         Swal.fire('Error', error.error?.message || 'Failed to load data from server', 'error');
         this.rowData = [];
+      }
+    });
+  }
+
+  // User Assignment Modal Methods
+  openUserAssignmentModal(project: PreSales): void {
+    this.selectedProjectForAssignment = project;
+    this.selectedUserId = '';
+    this.userSearchTerm = '';
+    this.filteredDevelopmentUsers = [...this.developmentUsers];
+    this.isUserAssignmentModalOpen = true;
+  }
+
+  closeUserAssignmentModal(): void {
+    this.isUserAssignmentModalOpen = false;
+    this.selectedProjectForAssignment = null;
+    this.selectedUserId = '';
+    this.userSearchTerm = '';
+  }
+
+  assignUserToProject(): void {
+    if (!this.selectedProjectForAssignment || !this.selectedUserId) {
+      Swal.fire('Error', 'Please select a user', 'error');
+      return;
+    }
+
+    const selectedUser = this.developmentUsers.find(u => u.userId === this.selectedUserId);
+    if (!selectedUser) {
+      Swal.fire('Error', 'Invalid user selection', 'error');
+      return;
+    }
+
+    this.isLoading = true;
+
+    // Call API to assign user - passing selectedUserId as assignedBy
+    this.apiService.assignUserToProject(
+      this.selectedProjectForAssignment.projectNo,
+      this.selectedUserId
+    ).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        if (response.success) {
+          Swal.fire('Success', 'User assigned successfully', 'success');
+          this.closeUserAssignmentModal();
+          this.loadPreSalesData(); // Refresh the grid
+        } else {
+          Swal.fire('Error', response.message || 'Failed to assign user', 'error');
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('Error assigning user:', error);
+        Swal.fire('Error', error.error?.message || 'Failed to assign user', 'error');
       }
     });
   }
@@ -1271,27 +1413,73 @@ export class DevelopmentComponent implements OnInit {
       next: (response) => {
         if (response.success) {
           this.existingStatusUpdates = response.data || [];
+          // Set default status: last status from history or 'Not Started'
+          this.setDefaultStatus();
         }
       },
       error: (error) => {
         console.error('Error loading status updates:', error);
         this.existingStatusUpdates = [];
+        // Set default status even on error
+        this.setDefaultStatus();
       }
     });
+  }
+
+  setDefaultStatus(): void {
+    if (this.existingStatusUpdates && this.existingStatusUpdates.length > 0) {
+      // Sort by date descending to get the most recent status
+      const sortedUpdates = [...this.existingStatusUpdates].sort((a, b) => {
+        const dateA = new Date(a.createdDate || a.updatedDate || 0).getTime();
+        const dateB = new Date(b.createdDate || b.updatedDate || 0).getTime();
+        return dateB - dateA; // Most recent first
+      });
+      
+      // Set to the most recent status from history
+      const lastStatus = sortedUpdates[0];
+      this.statusUpdate.statusCode = lastStatus.statusCode || lastStatus.status || '';
+      
+      console.log('[DefaultStatus] Most recent status:', lastStatus.statusCode || lastStatus.status, 'from date:', lastStatus.createdDate || lastStatus.updatedDate);
+    } else {
+      // Set to 'Not Started' if no history
+      const notStartedStatus = this.statusList.find(s => 
+        s.statusName?.toLowerCase() === 'not started' || 
+        s.statusCode === 'NS'
+      );
+      if (notStartedStatus) {
+        this.statusUpdate.statusCode = notStartedStatus.statusCode;
+      }
+    }
+    // Trigger status change to show/hide compiled file upload
+    this.onStatusChange();
   }
 
   onStatusChange(): void {
     const selectedStatus = this.statusList.find(s => s.statusCode === this.statusUpdate.statusCode);
     if (selectedStatus) {
-      // Show compiled file upload only for Completed status (CP)
-      this.showCompiledFileUpload = selectedStatus.statusCode === 'CP';
+      // Check if this is Testing Started (TS) or Completed (CP)
+      const statusCode = this.statusUpdate.statusCode;
+      this.showCompiledFileUpload = statusCode === 'TS' || statusCode === 'CP';
       
-      // Clear compiled file if status changed to one that doesn't require it
+      // Clear files when status changes
       if (!this.showCompiledFileUpload) {
         this.compiledFile = null;
         this.uploadedCompiledUrl = '';
       }
     }
+  }
+
+  isCompiledFileMandatory(): boolean {
+    // Compiled file is mandatory only for Testing Started (TS)
+    const statusCode = this.statusUpdate.statusCode;
+    return statusCode === 'TS';
+  }
+
+  showSourceUpload(): boolean {
+    // Show source upload for all statuses except Testing Started (TS)
+    // Completed (CP) should show both source and compiled
+    const statusCode = this.statusUpdate.statusCode;
+    return statusCode !== 'TS';
   }
 
   onFileChange(event: any, type: 'source' | 'compiled'): void {
@@ -1307,8 +1495,8 @@ export class DevelopmentComponent implements OnInit {
         this.sourceFile = file;
         this.uploadFileImmediately(file, 'source');
       } else {
-        if (!file.name.endsWith('.tcp')) {
-          Swal.fire('Invalid File', 'Please select a .tcp file for compiled file', 'error');
+        if (!file.name.endsWith('.tcp') && !file.name.endsWith('.zip')) {
+          Swal.fire('Invalid File', 'Please select a .tcp or .zip file for compiled file', 'error');
           return;
         }
         this.compiledFile = file;
@@ -1358,8 +1546,8 @@ export class DevelopmentComponent implements OnInit {
         this.sourceFile = file;
         this.uploadFileImmediately(file, 'source');
       } else {
-        if (!file.name.endsWith('.tcp')) {
-          Swal.fire('Invalid File', 'Please select a .tcp file for compiled file', 'error');
+        if (!file.name.endsWith('.tcp') && !file.name.endsWith('.zip')) {
+          Swal.fire('Invalid File', 'Please select a .tcp or .zip file for compiled file', 'error');
           return;
         }
         this.compiledFile = file;
@@ -1370,25 +1558,86 @@ export class DevelopmentComponent implements OnInit {
 
   uploadFileImmediately(file: File, type: 'source' | 'compiled'): void {
     console.log(`[File Upload] Starting upload for ${type} file:`, file.name);
+    
+    // Show loading message
+    Swal.fire({
+      title: 'Uploading File',
+      html: `<div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+        <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; border: 4px solid #f3f4f6; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin: 0; color: #6b7280;">Processing ${type} file...</p>
+        <p style="margin: 0; font-size: 0.875rem; color: #9ca3af;">${file.name}</p>
+      </div>
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      </style>`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+    
     this.apiService.uploadPreSalesAttachment(file).subscribe({
       next: (response) => {
-        console.log(`[File Upload] Response for ${type}:`, response);
+        console.log(`[File Upload] Full Response for ${type}:`, JSON.stringify(response, null, 2));
+        console.log(`[File Upload] Response type:`, typeof response);
+        console.log(`[File Upload] Response keys:`, response ? Object.keys(response) : 'null');
+        
         if (response) {
           // API returns {fullUrlPath, filename, contentType} directly
           const url = response.fullUrlPath || response.data?.fullUrlPath || response.data;
           console.log(`[File Upload] Extracted URL for ${type}:`, url);
+          console.log(`[File Upload] response.fullUrlPath:`, response.fullUrlPath);
+          console.log(`[File Upload] response.data:`, response.data);
+          console.log(`[File Upload] response.data?.fullUrlPath:`, response.data?.fullUrlPath);
+          
+          if (!url) {
+            console.error(`[File Upload] WARNING: URL is empty/undefined for ${type}!`);
+            Swal.fire({
+              icon: 'warning',
+              title: 'Upload Warning',
+              text: `File uploaded but no URL returned for ${type} file`,
+              confirmButtonColor: '#3b82f6'
+            });
+          } else {
+            // Close loading and show success
+            Swal.fire({
+              icon: 'success',
+              title: 'Upload Successful',
+              text: `${type.charAt(0).toUpperCase() + type.slice(1)} file uploaded successfully`,
+              timer: 1500,
+              showConfirmButton: false
+            });
+          }
+          
           if (type === 'source') {
-            this.uploadedSourceUrl = url;
+            this.uploadedSourceUrl = url || '';
             console.log('[File Upload] Source URL saved:', this.uploadedSourceUrl);
           } else {
-            this.uploadedCompiledUrl = url;
+            this.uploadedCompiledUrl = url || '';
             console.log('[File Upload] Compiled URL saved:', this.uploadedCompiledUrl);
           }
+        } else {
+          console.error(`[File Upload] Response is null/undefined for ${type}`);
+          Swal.fire({
+            icon: 'error',
+            title: 'Upload Failed',
+            text: 'No response received from server',
+            confirmButtonColor: '#dc2626'
+          });
         }
       },
       error: (error) => {
         console.error(`[File Upload] Error uploading ${type} file:`, error);
-        Swal.fire('Upload Error', `Failed to upload ${type} file`, 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'Upload Failed',
+          text: `Failed to upload ${type} file. Please try again.`,
+          confirmButtonColor: '#dc2626'
+        });
         if (type === 'source') {
           this.sourceFile = null;
         } else {
@@ -1414,6 +1663,18 @@ export class DevelopmentComponent implements OnInit {
       return;
     }
 
+    // Validate Testing Started (TS) requires compiled file
+    const statusCode = this.statusUpdate.statusCode;
+    if (statusCode === 'TS' && !this.uploadedCompiledUrl) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Compiled File Required',
+        text: 'Testing Started status requires compiled file (.tcp or .zip) to be uploaded',
+        confirmButtonColor: '#dc2626'
+      });
+      return;
+    }
+
     if (!this.selectedProject) {
       return;
     }
@@ -1421,16 +1682,25 @@ export class DevelopmentComponent implements OnInit {
     this.isLoading = true;
 
     const attachments = [];
+    console.log('[Submit] Current uploadedSourceUrl:', this.uploadedSourceUrl);
+    console.log('[Submit] Current uploadedCompiledUrl:', this.uploadedCompiledUrl);
+    
     if (this.uploadedSourceUrl) {
       console.log('[Submit] Adding source URL to attachments:', this.uploadedSourceUrl);
       attachments.push(this.uploadedSourceUrl);
+    } else {
+      console.log('[Submit] No source URL to add (empty or undefined)');
     }
     if (this.uploadedCompiledUrl) {
       console.log('[Submit] Adding compiled URL to attachments:', this.uploadedCompiledUrl);
       attachments.push(this.uploadedCompiledUrl);
+    } else {
+      console.log('[Submit] No compiled URL to add (empty or undefined)');
     }
 
     console.log('[Submit] Total attachments:', attachments);
+    console.log('[Submit] Attachments length:', attachments.length);
+    console.log('[Submit] Attachments array contents:', JSON.stringify(attachments));
 
     const projectNoNumber = typeof this.selectedProject.projectNo === 'string' 
       ? parseInt(this.selectedProject.projectNo, 10) 
@@ -1452,7 +1722,7 @@ export class DevelopmentComponent implements OnInit {
         if (response.success) {
           Swal.fire('Success', 'Status update added successfully', 'success');
           this.resetStatusForm();
-          this.loadExistingStatusUpdates(); // Refresh the status updates table
+          this.loadExistingStatusUpdates(); // Refresh the status updates table and set new default
           this.loadPreSalesData(); // Refresh the grid
         } else {
           Swal.fire('Error', response.message || 'Failed to add status update', 'error');

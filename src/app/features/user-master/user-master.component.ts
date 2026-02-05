@@ -199,7 +199,7 @@ export class UserMasterComponent implements OnInit {
       userName: ['', [Validators.required, Validators.minLength(2)]],
       emailId: ['', [Validators.required, Validators.email]],
       roleId: ['', Validators.required],
-      employeeType: ['', Validators.required]
+      employeeType: ['']
     });
     
     this.roleForm = this.fb.group({

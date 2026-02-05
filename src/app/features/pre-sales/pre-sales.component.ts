@@ -133,6 +133,36 @@ export class PreSalesComponent implements OnInit {
         return container;
       }
     },
+    { 
+      field: 'statusUpdates', 
+      headerName: 'Status', 
+      width: 180,
+      valueGetter: (params: any) => {
+        const statusUpdates = params.data?.statusUpdates;
+        if (statusUpdates && statusUpdates.length > 0) {
+          return statusUpdates[statusUpdates.length - 1].statusName;
+        }
+        return 'Not Started';
+      },
+      cellRenderer: (params: any) => {
+        const statusUpdates = params.data?.statusUpdates;
+        const latestStatus = statusUpdates && statusUpdates.length > 0 
+          ? statusUpdates[statusUpdates.length - 1].statusName 
+          : 'Not Started';
+        
+        const colors: { [key: string]: string } = {
+          'Not Started': 'bg-gray-100 text-gray-800',
+          'In Progress': 'bg-blue-100 text-blue-800',
+          'Testing Started': 'bg-yellow-100 text-yellow-800',
+          'Completed': 'bg-green-100 text-green-800'
+        };
+        
+        const container = document.createElement('span');
+        container.className = `px-2 py-1 text-xs font-medium rounded ${colors[latestStatus] || 'bg-gray-100 text-gray-800'}`;
+        container.textContent = latestStatus;
+        return container;
+      }
+    },
     {
       headerName: 'Actions',
       width: 260,
@@ -282,6 +312,10 @@ export class PreSalesComponent implements OnInit {
         recordedBy: serial.recordedByName || serial.recordedBy || 'Unknown',
         recordedDate: serial.recordedDate
       })) || [],
+      statusUpdates: apiData.statusUpdates?.map((status: any) => ({
+        statusName: status.statusName,
+        latestFileUrl: status.latestFileUrl
+      })) || [],
       attachmentHistory: apiData.attachmentHistory?.map((history: any) => ({
         attachmentUrls: history.attachmentUrls,
         uploadedById: history.uploadedById,
@@ -293,7 +327,7 @@ export class PreSalesComponent implements OnInit {
 
   loadPreSalesData(): void {
     this.isLoading = true;
-    this.apiService.getAllPreSales().subscribe({
+    this.apiService.getAllPreSales(this.currentUserId).subscribe({
       next: (response) => {
         this.isLoading = false;
         if (response.success && response.data) {
@@ -1010,6 +1044,114 @@ export class PreSalesComponent implements OnInit {
       serialSection = '<div class="empty-state"><div class="empty-icon">🔢</div><div class="empty-text">No serial numbers assigned</div><div class="empty-subtext">Serial numbers will be listed after assignment</div></div>';
     }
     
+    // Calculate pending amount
+    const totalAdvance = data.advancePayments?.reduce((sum, adv) => sum + adv.amount, 0) || 0;
+    const pendingAmount = data.projectValue - totalAdvance;
+    const isPaymentComplete = pendingAmount <= 0;
+    
+    // Build status history section
+    let statusSection = '';
+    if (data.statusUpdates && data.statusUpdates.length > 0) {
+      statusSection = `
+        <div class="content-section">
+          <h2 class="section-title">📈 Development Status History <span style="color: #0891b2; font-size: 0.875rem; margin-left: 12px; font-weight: 700;">${data.statusUpdates.length} updates</span></h2>
+          
+          ${!isPaymentComplete ? `
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: start; gap: 12px;">
+              <svg style="width: 24px; height: 24px; color: #d97706; flex-shrink: 0; margin-top: 2px;" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+              </svg>
+              <div style="flex: 1;">
+                <div style="font-size: 0.875rem; font-weight: 700; color: #92400e; margin-bottom: 4px;">File Downloads Locked</div>
+                <div style="font-size: 0.75rem; color: #78350f; line-height: 1.4;">
+                  Complete payment to unlock file downloads. Pending amount: <strong style="font-size: 0.875rem;">₹${pendingAmount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</strong>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+          
+          <div class="status-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">
+            ${data.statusUpdates.slice().reverse().map((status: any, idx: number) => {
+              const fileName = status.latestFileUrl ? status.latestFileUrl.split('/').pop() : '';
+              const statusColors: any = {
+                'Not Started': { bg: '#f3f4f6', border: '#d1d5db', text: '#374151', icon: '#9ca3af' },
+                'In Progress': { bg: '#dbeafe', border: '#93c5fd', text: '#1e40af', icon: '#3b82f6' },
+                'Testing Started': { bg: '#fef3c7', border: '#fcd34d', text: '#92400e', icon: '#f59e0b' },
+                'Completed': { bg: '#d1fae5', border: '#6ee7b7', text: '#065f46', icon: '#10b981' }
+              };
+              const colors = statusColors[status.statusName] || statusColors['Not Started'];
+              
+              const attachmentHtml = status.latestFileUrl ? `
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid ${colors.border};">
+                  ${isPaymentComplete ? `
+                    <a href="${status.latestFileUrl}" target="_blank" download rel="noopener noreferrer" 
+                       style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #ffffff; border: 1.5px solid ${colors.border}; border-radius: 6px; text-decoration: none; transition: all 0.2s ease; cursor: pointer;"
+                       onmouseover="this.style.borderColor='${colors.icon}'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'; this.style.transform='translateY(-2px)';"
+                       onmouseout="this.style.borderColor='${colors.border}'; this.style.boxShadow='none'; this.style.transform='translateY(0)';">
+                      <div style="width: 40px; height: 40px; background: ${colors.bg}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg style="width: 20px; height: 20px; color: ${colors.icon};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                      </div>
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.813rem; font-weight: 600; color: #1e293b; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                        <div style="font-size: 0.688rem; color: #64748b; display: flex; align-items: center; gap: 4px;">
+                          <svg style="width: 12px; height: 12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                          </svg>
+                          Click to download
+                        </div>
+                      </div>
+                      <svg style="width: 18px; height: 18px; color: ${colors.icon}; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
+                    </a>
+                  ` : `
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fef3c7; border: 1.5px dashed #f59e0b; border-radius: 6px; cursor: not-allowed; opacity: 0.7;">
+                      <div style="width: 40px; height: 40px; background: #fde68a; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg style="width: 20px; height: 20px; color: #d97706;" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                        </svg>
+                      </div>
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.813rem; font-weight: 600; color: #92400e; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                        <div style="font-size: 0.688rem; color: #78350f; display: flex; align-items: center; gap: 4px;">
+                          <svg style="width: 12px; height: 12px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                          </svg>
+                          Locked - Complete payment
+                        </div>
+                      </div>
+                    </div>
+                  `}
+                </div>
+              ` : '<div style="margin-top: 12px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; text-align: center; font-size: 0.75rem; color: #94a3b8;">No file attached</div>';
+              
+              return `
+                <div style="background: ${colors.bg}; border: 2px solid ${colors.border}; border-radius: 10px; padding: 16px; transition: all 0.2s ease; ${idx === 0 ? 'box-shadow: 0 4px 12px rgba(0,0,0,0.1);' : ''}"
+                     onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.15)';"
+                     onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='${idx === 0 ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'}';">
+                  <div style="display: flex; align-items: start; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 48px; height: 48px; background: #ffffff; border: 2px solid ${colors.border}; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                      <svg style="width: 24px; height: 24px; color: ${colors.icon};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                    </div>
+                    <div style="flex: 1;">
+                      <div style="font-size: 1rem; font-weight: 700; color: ${colors.text}; margin-bottom: 4px;">${status.statusName}</div>
+                      ${idx === 0 ? '<div style="display: inline-block; background: ' + colors.icon + '; color: #ffffff; padding: 2px 10px; border-radius: 12px; font-size: 0.688rem; font-weight: 700; letter-spacing: 0.5px;">LATEST</div>' : '<div style="font-size: 0.75rem; color: ' + colors.text + '; opacity: 0.7;">Previous status</div>'}
+                    </div>
+                  </div>
+                  ${attachmentHtml}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      statusSection = '<div class="empty-state"><div class="empty-icon">📈</div><div class="empty-text">No status updates</div><div class="empty-subtext">Status updates will appear here once added</div></div>';
+    }
     // Build stage history section
     let stageSection = '';
     if (data.stageHistory && data.stageHistory.length > 0) {
@@ -1524,6 +1666,10 @@ export class PreSalesComponent implements OnInit {
                 <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>
                 <span>Serial Numbers</span>
               </div>
+              <div class="nav-item" data-tab="status">
+                <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                <span>Status History</span>
+              </div>
             </div>
             
             <div class="main-content">
@@ -1573,6 +1719,10 @@ export class PreSalesComponent implements OnInit {
             
             <div id="serial" class="tab-panel">
               ${serialSection}
+            </div>
+            
+            <div id="status" class="tab-panel">
+              ${statusSection}
             </div>
             </div>
           </div>

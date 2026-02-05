@@ -27,6 +27,11 @@ export interface SerialNumber {
   recordedDate: Date;
 }
 
+export interface StatusUpdate {
+  statusName: string;
+  latestFileUrl?: string | null;
+}
+
 export interface AttachmentHistory {
   attachmentUrls: string[];
   uploadedById: string;
@@ -49,8 +54,10 @@ export interface PreSales {
   projectValue: number;
   scopeOfDevelopment: string;
   currentStage: ProjectStage;
+  assignedTo?: string;
   scopeHistory?: ScopeVersion[];
   stageHistory?: StageHistory[];
+  statusUpdates?: StatusUpdate[];
   advancePayments?: AdvancePayment[];
   serialNumbers?: SerialNumber[];
   attachments?: File[];
