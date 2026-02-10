@@ -7,7 +7,6 @@ export interface MenuItem {
   active?: boolean;
   roles?: string[];
   children?: MenuItem[];
-  
   // New structure (from API)
   menuId?: string;
   menuName?: string;
@@ -16,7 +15,6 @@ export interface MenuItem {
   order?: number;
   mainMenuId?: string | null;
   submenu?: MenuItem[];
-  
   // UI state
   expanded?: boolean;
 }

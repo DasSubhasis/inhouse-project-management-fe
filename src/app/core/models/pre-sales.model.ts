@@ -4,14 +4,12 @@ export interface ScopeVersion {
   modifiedBy: string;
   modifiedDate: Date;
 }
-
 export interface StageHistory {
   stage: string;
   changedBy: string;
   changedDate: Date;
   remarks?: string;
 }
-
 export interface AdvancePayment {
   amount: number;
   date: Date;
@@ -19,30 +17,24 @@ export interface AdvancePayment {
   receivedBy: string;
   receivedDate: Date;
 }
-
 export interface SerialNumber {
   serialNumber: string;
   version?: string;
   recordedBy: string;
   recordedDate: Date;
 }
-
 export interface StatusUpdate {
   statusName: string;
   latestFileUrl?: string | null;
 }
-
 export interface AttachmentHistory {
   attachmentUrls: string[];
   uploadedById: string;
   uploadedByName: string;
   uploadedDate: string;
 }
-
 export type ProjectStage = 'Pre-Sales' | 'Quotation' | 'Confirmed' | 'Development' | 'Completed';
-
 export const PROJECT_STAGES: ProjectStage[] = ['Pre-Sales', 'Quotation', 'Confirmed'];
-
 export interface PreSales {
   projectNo: string;
   partyName: string;

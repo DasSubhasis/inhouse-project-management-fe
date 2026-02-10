@@ -8,3 +8,4 @@ export interface CallLog {
   status: 'completed' | 'missed';
   notes: string;
 }
+
